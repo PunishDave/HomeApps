@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+build/
+
+# Local configuration
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# Mac / Windows junk
+.DS_Store
+Thumbs.db
+
+# Kotlin / Java
+out/
+
+# Keystores (never commit these)
+*.jks
+*.keystore
+
+# Logs
+*.log
+
+# Android Studio captures
+captures/
+
+# External native build
+.cxx/
