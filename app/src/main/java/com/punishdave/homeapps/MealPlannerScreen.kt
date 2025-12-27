@@ -20,7 +20,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -294,7 +293,6 @@ fun MealPlannerPlanWeekScreen(
     val recipes = vm.recipes.collectAsState().value
     val plannedWeek = vm.plannedWeek.collectAsState().value
 
-    val scope = rememberCoroutineScope()
     val start = startOfWeekSaturday(LocalDate.now()).plusDays(7)
     val days = remember(start) { (0..6).map { start.plusDays(it.toLong()) } }
 
@@ -339,34 +337,24 @@ fun MealPlannerPlanWeekScreen(
 
                 FilledTonalButton(
                     onClick = {
-                        // Build payload from current selections and POST it
-                        val meals: MutableMap<String, Recipe> = linkedMapOf()
+                        // Build WeekResponse from current selections and save locally; sync will push to API
+                        val meals = mutableListOf<Recipe>()
                         for (i in 0..6) {
                             val rid = selectedByDay[i] ?: -1
                             val recipe = options.firstOrNull { it.id == rid }?.takeIf { it.id != -1 }
-                            if (recipe != null) meals[i.toString()] = recipe
-                        }
-
-                        scope.launch {
-                            try {
-                                if (meals.size != 7) {
-                                    vm.lastError.value = "Pick a meal for all 7 days before saving."
-                                    return@launch
-                                }
-
-                                Network.api.postWeek(
-                                    WeekPostRequest(
-                                        week_start = start.toString(),
-                                        meals = meals
-                                    )
-                                )
-
-                                // Refresh local current week + recipes after save
-                                vm.sync()
-                            } catch (e: Exception) {
-                                vm.lastError.value = e.message ?: "Save failed"
+                            if (recipe != null) {
+                                meals.add(recipe)
+                            } else {
+                                vm.lastError.value = "Pick a meal for all 7 days before saving."
+                                return@FilledTonalButton
                             }
                         }
+
+                        val week = WeekResponse(
+                            week_start = start.toString(),
+                            meals = meals
+                        )
+                        vm.savePlannedWeekLocal(week)
                     },
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = Accent.copy(alpha = 0.55f),
@@ -464,10 +452,14 @@ private fun PlanWeekDayCard(
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                         colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
+                            focusedContainerColor = Color(0xFF1E1E1E),
+                            unfocusedContainerColor = Color(0xFF1A1A1A),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedIndicatorColor = Accent.copy(alpha = 0.8f),
+                            unfocusedIndicatorColor = Accent.copy(alpha = 0.6f),
+                            focusedTrailingIconColor = Color.White,
+                            unfocusedTrailingIconColor = Color.White
                         ),
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)

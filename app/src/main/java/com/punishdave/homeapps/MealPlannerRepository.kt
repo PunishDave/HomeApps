@@ -12,6 +12,8 @@ class MealPlannerRepository(
     fun recipesFlow() = store.recipesFlow
     fun currentWeekFlow() = store.currentWeekFlow
     fun plannedWeekFlow() = store.plannedWeekFlow
+    suspend fun saveLocalPlannedWeek(week: WeekResponse) = store.savePlannedWeek(week)
+    suspend fun clearPlannedWeek() = store.clearPlannedWeek()
 
     // Match your UI week starting Saturday (change to MONDAY if needed)
     fun computeWeekStartIso(today: LocalDate = LocalDate.now()): String {
@@ -71,8 +73,10 @@ class MealPlannerRepository(
 
         val saved = api.postWeek(body)
 
-        // optional: store as current week
-        store.saveCurrentWeek(saved)
+        // Only mirror to current-week cache if it matches the "current" start
+        if (week.week_start == computeWeekStartIso()) {
+            store.saveCurrentWeek(saved)
+        }
     }
 
 }

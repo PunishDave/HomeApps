@@ -22,11 +22,24 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         isSyncing.value = true
         lastError.value = null
         try {
+            // If a planned week exists, push it first
+            plannedWeek.value?.let { week ->
+                repo.savePlannedWeekToServer(week)
+                repo.clearPlannedWeek()
+            }
             repo.sync()
         } catch (e: Exception) {
             lastError.value = e.message ?: "Sync failed"
         } finally {
             isSyncing.value = false
+        }
+    }
+
+    fun savePlannedWeekLocal(week: WeekResponse) = viewModelScope.launch {
+        try {
+            repo.saveLocalPlannedWeek(week)
+        } catch (e: Exception) {
+            lastError.value = e.message ?: "Save failed"
         }
     }
 

@@ -37,4 +37,8 @@ class MealPlannerStore(private val context: Context) {
     suspend fun savePlannedWeek(week: WeekResponse) {
         context.dataStore.edit { it[KEY_PLANNED_WEEK] = Network.weekAdapter.toJson(week) }
     }
+
+    suspend fun clearPlannedWeek() {
+        context.dataStore.edit { it.remove(KEY_PLANNED_WEEK) }
+    }
 }
