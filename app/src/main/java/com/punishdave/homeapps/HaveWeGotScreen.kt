@@ -150,9 +150,9 @@ private fun SummarySection(summary: HaveWeGotSummary) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StatCard(label = "Total", value = summary.total)
-        StatCard(label = "Films", value = films)
-        StatCard(label = "TV Shows", value = tv)
+        StatCard(label = "Total", value = summary.total, modifier = Modifier.weight(1f))
+        StatCard(label = "Films", value = films, modifier = Modifier.weight(1f))
+        StatCard(label = "TV Shows", value = tv, modifier = Modifier.weight(1f))
     }
 
     if (summary.by_status.isNotEmpty()) {
@@ -183,9 +183,9 @@ private fun SummarySection(summary: HaveWeGotSummary) {
 }
 
 @Composable
-private fun StatCard(label: String, value: Int) {
+private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier.weight(1f),
+        modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         color = HwgPanel,
         tonalElevation = 3.dp,
@@ -235,7 +235,7 @@ private fun FilterRow(
                     onClick = { onTypeSelected(id) },
                     label = { Text(label) },
                     leadingIcon = null,
-                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                    colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = HwgAccent.copy(alpha = 0.4f),
                         selectedLabelColor = Color.White
                     )
@@ -281,8 +281,8 @@ private fun FilterRow(
                 singleLine = true,
                 placeholder = { Text("Search by name") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                keyboardOptions = androidx.compose.ui.text.input.KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
-                keyboardActions = androidx.compose.ui.text.input.KeyboardActions(
+                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
                     onSearch = { onApplySearch() }
                 )
             )
