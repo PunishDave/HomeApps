@@ -40,13 +40,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardActions
-import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 
 private val HwgBg = Color(0xFF1C1C1C)
 private val HwgPanel = Color(0xFF0F0F0F)
@@ -150,9 +150,9 @@ private fun SummarySection(summary: HaveWeGotSummary) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StatCard(label = "Total", value = summary.total, modifier = Modifier.weight(1f))
-        StatCard(label = "Films", value = films, modifier = Modifier.weight(1f))
-        StatCard(label = "TV Shows", value = tv, modifier = Modifier.weight(1f))
+        Box(modifier = Modifier.weight(1f)) { StatCard(label = "Total", value = summary.total) }
+        Box(modifier = Modifier.weight(1f)) { StatCard(label = "Films", value = films) }
+        Box(modifier = Modifier.weight(1f)) { StatCard(label = "TV Shows", value = tv) }
     }
 
     if (summary.by_status.isNotEmpty()) {
@@ -183,9 +183,9 @@ private fun SummarySection(summary: HaveWeGotSummary) {
 }
 
 @Composable
-private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
+private fun StatCard(label: String, value: Int) {
     Surface(
-        modifier = modifier,
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = HwgPanel,
         tonalElevation = 3.dp,
