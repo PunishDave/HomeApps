@@ -6,7 +6,7 @@ import retrofit2.http.Query
 
 interface HaveWeGotApi {
     @GET("summary")
-    suspend fun getSummary(): HaveWeGotSummary
+    suspend fun getSummary(): Map<String, @JvmSuppressWildcards Any?>
 
     @GET("items")
     suspend fun listItems(
@@ -17,13 +17,6 @@ interface HaveWeGotApi {
         @Query("limit") limit: Int? = 200
     ): List<HaveWeGotItem>
 }
-
-@JsonClass(generateAdapter = true)
-data class HaveWeGotSummary(
-    val total: Int = 0,
-    val by_type: Map<String, Int> = emptyMap(),
-    val by_status: Map<String, Int> = emptyMap()
-)
 
 @JsonClass(generateAdapter = true)
 data class HaveWeGotItem(
