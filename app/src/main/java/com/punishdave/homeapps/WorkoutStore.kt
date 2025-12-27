@@ -1,0 +1,28 @@
+package com.punishdave.homeapps
+
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+private val Context.workoutDataStore by preferencesDataStore(name = "workout_store")
+
+class WorkoutStore(private val context: Context) {
+    private val KEY_ENTRIES = stringPreferencesKey("workout_entries_json")
+
+    private val moshi: Moshi = Moshi.Builder().build()
+    private val listType = Types.newParameterizedType(List::class.java, WorkoutEntry::class.java)
+    private val adapter = moshi.adapter<List<WorkoutEntry>>(listType)
+
+    val entriesFlow: Flow<List<WorkoutEntry>> = context.workoutDataStore.data.map { prefs ->
+        prefs[KEY_ENTRIES]?.let { adapter.fromJson(it) } ?: emptyList()
+    }
+
+    suspend fun saveEntries(entries: List<WorkoutEntry>) {
+        context.workoutDataStore.edit { it[KEY_ENTRIES] = adapter.toJson(entries) }
+    }
+}
