@@ -150,7 +150,8 @@ fun HomeAppsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()   // <-- adds safe top inset
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp)
+                .padding(top = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
         Text(

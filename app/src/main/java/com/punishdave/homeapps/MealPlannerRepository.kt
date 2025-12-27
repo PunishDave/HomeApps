@@ -42,7 +42,20 @@ class MealPlannerRepository(
     }
 
     suspend fun generateRandomWeek() {
-        val week = api.getRandomWeek()
+        // Backend returns a bare list of recipes; wrap it into a WeekResponse the app expects.
+        val recipes = api.getRandomWeek()
+        if (recipes.isEmpty()) throw IllegalStateException("No recipes available to generate a week.")
+
+        // Align with UI: plan for the upcoming week starting Saturday.
+        val nextWeekStart = computeWeekStartIso(LocalDate.now().plusDays(7))
+
+        // Ensure we always have 7 entries; repeat recipes if the API returns fewer.
+        val mealsForWeek = (0 until 7).map { idx -> recipes[idx % recipes.size] }
+
+        val week = WeekResponse(
+            week_start = nextWeekStart,
+            meals = mealsForWeek
+        )
         store.savePlannedWeek(week)
     }
 

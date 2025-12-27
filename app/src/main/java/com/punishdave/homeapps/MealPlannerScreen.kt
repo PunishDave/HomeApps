@@ -54,7 +54,8 @@ fun MealPlannerMenuScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(20.dp)
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .padding(top = 16.dp)
         ) {
         Text(
                 text = "Meal Planner",
@@ -197,7 +198,9 @@ fun MealPlannerCurrentWeekScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .padding(top = 16.dp)
         ) {
             TopTitleWithBack(title = "Current Week", onBack = onBack)
 
@@ -314,7 +317,9 @@ fun MealPlannerPlanWeekScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .padding(top = 16.dp)
         ) {
             TopTitleWithBack(title = "Plan a week", onBack = onBack)
 

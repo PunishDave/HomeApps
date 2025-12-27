@@ -8,7 +8,7 @@ interface MealPlannerApi {
     suspend fun getWeek(@Query("week_start") weekStart: String): WeekResponse
 
     @GET("random-week")
-    suspend fun getRandomWeek(): WeekResponse
+    suspend fun getRandomWeek(): List<Recipe>
 
     @POST("weeks")
     suspend fun postWeek(@Body body: WeekPostRequest): WeekResponse
