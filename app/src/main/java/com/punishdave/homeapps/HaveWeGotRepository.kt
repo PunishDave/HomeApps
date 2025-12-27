@@ -7,6 +7,7 @@ class HaveWeGotRepository(
         val raw = api.getSummary()
         val total = raw["total"].asInt()
 
+        // Backend sometimes returns objects, sometimes arrays. Handle both.
         val byType = normalizeCounts(raw["by_type"], primaryKey = "item_type", secondaryKey = "status")
         val byStatus = normalizeCounts(raw["by_status"], primaryKey = "status", secondaryKey = "item_type")
 
