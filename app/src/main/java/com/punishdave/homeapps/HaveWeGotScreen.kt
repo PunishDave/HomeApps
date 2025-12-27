@@ -2,7 +2,6 @@ package com.punishdave.homeapps
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -146,13 +144,13 @@ private fun SummarySection(summary: HaveWeGotSummary) {
     val films = summary.by_type["film"] ?: 0
     val tv = summary.by_type["tvshow"] ?: 0
 
-    Row(
+    LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(modifier = Modifier.weight(1f)) { StatCard(label = "Total", value = summary.total) }
-        Box(modifier = Modifier.weight(1f)) { StatCard(label = "Films", value = films) }
-        Box(modifier = Modifier.weight(1f)) { StatCard(label = "TV Shows", value = tv) }
+        item { StatCard(label = "Total", value = summary.total, modifier = Modifier.width(170.dp)) }
+        item { StatCard(label = "Films", value = films, modifier = Modifier.width(170.dp)) }
+        item { StatCard(label = "TV Shows", value = tv, modifier = Modifier.width(170.dp)) }
     }
 
     if (summary.by_status.isNotEmpty()) {
@@ -183,9 +181,9 @@ private fun SummarySection(summary: HaveWeGotSummary) {
 }
 
 @Composable
-private fun StatCard(label: String, value: Int) {
+private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         color = HwgPanel,
         tonalElevation = 3.dp,
@@ -269,13 +267,9 @@ private fun FilterRow(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 value = search,
                 onValueChange = onSearchChange,
                 singleLine = true,
@@ -287,14 +281,19 @@ private fun FilterRow(
                 )
             )
 
-            FilledTonalButton(
-                onClick = onApplySearch,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = HwgAccent.copy(alpha = 0.65f),
-                    contentColor = Color.White
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text("Apply")
+                FilledTonalButton(
+                    onClick = onApplySearch,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = HwgAccent.copy(alpha = 0.65f),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Apply")
+                }
             }
         }
     }
