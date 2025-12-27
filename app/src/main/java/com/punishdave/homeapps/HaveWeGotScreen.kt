@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -31,6 +32,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,6 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 private val HwgBg = Color(0xFF1C1C1C)
 private val HwgPanel = Color(0xFF0F0F0F)
@@ -62,6 +69,7 @@ fun HaveWeGotScreen(
     val type by vm.typeFilter.collectAsState()
     val status by vm.statusFilter.collectAsState()
     val search by vm.search.collectAsState()
+    var filtersExpanded by remember { mutableStateOf(true) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = HwgBg) {
         Column(
@@ -121,7 +129,9 @@ fun HaveWeGotScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            FilterRow(
+            FiltersCard(
+                expanded = filtersExpanded,
+                onToggle = { filtersExpanded = !filtersExpanded },
                 selectedType = type,
                 onTypeSelected = vm::setType,
                 selectedStatus = status,
@@ -129,7 +139,9 @@ fun HaveWeGotScreen(
                 availableStatuses = summary?.by_status ?: emptyMap(),
                 search = search,
                 onSearchChange = vm::setSearch,
-                onApplySearch = { vm.refresh() }
+                onApplySearch = { vm.refresh() },
+                onSwipeHide = { filtersExpanded = false },
+                onSwipeShow = { filtersExpanded = true }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -151,32 +163,6 @@ private fun SummarySection(summary: HaveWeGotSummary) {
         item { StatCard(label = "Total", value = summary.total, modifier = Modifier.width(170.dp)) }
         item { StatCard(label = "Films", value = films, modifier = Modifier.width(170.dp)) }
         item { StatCard(label = "TV Shows", value = tv, modifier = Modifier.width(170.dp)) }
-    }
-
-    if (summary.by_status.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = "Status",
-            color = Color(0xFFEEEEEE),
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 6.dp)
-        )
-
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item {
-                AssistChip(
-                    onClick = { /* no-op display only */ },
-                    label = { Text("All: ${summary.total}") },
-                    leadingIcon = null
-                )
-            }
-            items(summary.by_status.entries.toList()) { entry ->
-                AssistChip(
-                    onClick = { /* display only */ },
-                    label = { Text("${entry.key}: ${entry.value}") }
-                )
-            }
-        }
     }
 }
 
@@ -205,7 +191,11 @@ private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun FilterRow(
+private fun FiltersCard(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onSwipeHide: () -> Unit,
+    onSwipeShow: () -> Unit,
     selectedType: String,
     onTypeSelected: (String) -> Unit,
     selectedStatus: String,
@@ -215,84 +205,132 @@ private fun FilterRow(
     onSearchChange: (String) -> Unit,
     onApplySearch: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+    var totalDrag = 0f
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = HwgPanel,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, HwgAccent.copy(alpha = 0.35f)),
+        tonalElevation = 2.dp,
+        onClick = onToggle
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(12.dp)
+                .pointerInput(expanded) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { _, dragAmount ->
+                            totalDrag += dragAmount
+                        },
+                        onDragEnd = {
+                            if (totalDrag < -60f) onSwipeHide()
+                            if (totalDrag > 60f) onSwipeShow()
+                            totalDrag = 0f
+                        },
+                        onDragCancel = { totalDrag = 0f }
+                    )
+                },
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            val options = listOf(
-                "all" to "All",
-                "film" to "Films",
-                "tvshow" to "TV"
-            )
-
-            options.forEach { (id, label) ->
-                FilterChip(
-                    selected = selectedType == id,
-                    onClick = { onTypeSelected(id) },
-                    label = { Text(label) },
-                    leadingIcon = null,
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = HwgAccent.copy(alpha = 0.4f),
-                        selectedLabelColor = Color.White
-                    )
-                )
-            }
-        }
-
-        if (availableStatuses.isNotEmpty()) {
-            Text(
-                text = "Filter by status",
-                color = Color(0xFFDDDDDD),
-                fontWeight = FontWeight.SemiBold
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item {
-                    FilterChip(
-                        selected = selectedStatus.isEmpty(),
-                        onClick = { onStatusSelected("") },
-                        label = { Text("All") },
-                        leadingIcon = null
-                    )
-                }
-                items(availableStatuses.entries.toList()) { entry ->
-                    FilterChip(
-                        selected = selectedStatus.equals(entry.key, ignoreCase = true),
-                        onClick = { onStatusSelected(entry.key) },
-                        label = { Text("${entry.key} (${entry.value})") },
-                        leadingIcon = null
-                    )
-                }
-            }
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = search,
-                onValueChange = onSearchChange,
-                singleLine = true,
-                placeholder = { Text("Search by name") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = { onApplySearch() }
-                )
-            )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                FilledTonalButton(
-                    onClick = onApplySearch,
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = HwgAccent.copy(alpha = 0.65f),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text("Apply")
+                Text(
+                    text = if (expanded) "Filters (swipe up to hide)" else "Filters (swipe down to show)",
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (expanded) "Hide" else "Show",
+                    color = HwgAccent,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val options = listOf(
+                            "all" to "All",
+                            "film" to "Films",
+                            "tvshow" to "TV"
+                        )
+
+                        options.forEach { (id, label) ->
+                            FilterChip(
+                                selected = selectedType == id,
+                                onClick = { onTypeSelected(id) },
+                                label = { Text(label) },
+                                leadingIcon = null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = HwgAccent.copy(alpha = 0.4f),
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+
+                    if (availableStatuses.isNotEmpty()) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                FilterChip(
+                                    selected = selectedStatus.isEmpty(),
+                                    onClick = { onStatusSelected("") },
+                                    label = { Text("All") },
+                                    leadingIcon = null
+                                )
+                            }
+                            items(availableStatuses.entries.toList()) { entry ->
+                                FilterChip(
+                                    selected = selectedStatus.equals(entry.key, ignoreCase = true),
+                                    onClick = { onStatusSelected(entry.key) },
+                                    label = { Text("${entry.key} (${entry.value})") },
+                                    leadingIcon = null
+                                )
+                            }
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = search,
+                            onValueChange = onSearchChange,
+                            singleLine = true,
+                            placeholder = { Text("Search by name") },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = { onApplySearch() }
+                            )
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            FilledTonalButton(
+                                onClick = onApplySearch,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = HwgAccent.copy(alpha = 0.65f),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text("Apply")
+                            }
+                        }
+                    }
                 }
             }
         }
