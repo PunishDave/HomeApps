@@ -86,7 +86,11 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    composable(Route.HaveWeGot.id) { PlaceholderScreen("Have We Got") }
+                    composable(Route.HaveWeGot.id) {
+                        HaveWeGotScreen(
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                     composable(Route.Todo.id) { PlaceholderScreen("To-Do") }
                     composable(Route.WorkoutLog.id) { PlaceholderScreen("Workout Log") }
                 }

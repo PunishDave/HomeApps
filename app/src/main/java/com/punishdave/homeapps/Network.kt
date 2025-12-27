@@ -28,6 +28,13 @@ object Network {
         .build()
         .create(MealPlannerApi::class.java)
 
+    val haveWeGotApi: HaveWeGotApi = Retrofit.Builder()
+        .baseUrl("https://apm.d4c.myftpupload.com/index.php/wp-json/have-we-got/v1/")
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .client(client)
+        .build()
+        .create(HaveWeGotApi::class.java)
+
     // DataStore JSON adapters
     val weekAdapter = moshi.adapter(WeekResponse::class.java)
 
