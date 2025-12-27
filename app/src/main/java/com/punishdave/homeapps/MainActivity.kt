@@ -93,6 +93,11 @@ class MainActivity : ComponentActivity() {
                     }
                     composable(Route.Todo.id) { PlaceholderScreen("To-Do") }
                     composable(Route.WorkoutLog.id) { PlaceholderScreen("Workout Log") }
+                    composable(Route.Todo.id) {
+                        TodoScreen(
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
             }
         }
