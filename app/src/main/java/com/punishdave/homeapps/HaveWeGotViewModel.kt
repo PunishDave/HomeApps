@@ -35,14 +35,22 @@ class HaveWeGotViewModel(
             val status = statusFilter.value
             val searchText = search.value
 
-            val summaryResponse = repo.fetchSummary()
-            _summary.value = summaryResponse
-
             val itemsResponse = repo.fetchItems(
                 type = type,
                 status = status,
                 search = searchText
             )
+
+            val summaryResponse = repo.fetchSummary()
+            val computed = computeCounts(itemsResponse)
+
+            val mergedSummary = HaveWeGotSummary(
+                total = if (summaryResponse.total > 0) summaryResponse.total else computed.total,
+                by_type = if (summaryResponse.by_type.isNotEmpty()) summaryResponse.by_type else computed.by_type,
+                by_status = if (summaryResponse.by_status.isNotEmpty()) summaryResponse.by_status else computed.by_status
+            )
+
+            _summary.value = mergedSummary
             _items.value = itemsResponse
         } catch (e: Exception) {
             error.value = e.message ?: "Failed to load data"
@@ -63,5 +71,24 @@ class HaveWeGotViewModel(
 
     fun setSearch(text: String) {
         search.value = text
+    }
+
+    private fun computeCounts(items: List<HaveWeGotItem>): HaveWeGotSummary {
+        val byType = mutableMapOf<String, Int>()
+        val byStatus = mutableMapOf<String, Int>()
+
+        items.forEach { item ->
+            val typeKey = item.item_type.lowercase()
+            val statusKey = item.status
+
+            byType[typeKey] = (byType[typeKey] ?: 0) + 1
+            byStatus[statusKey] = (byStatus[statusKey] ?: 0) + 1
+        }
+
+        return HaveWeGotSummary(
+            total = items.size,
+            by_type = byType,
+            by_status = byStatus
+        )
     }
 }
