@@ -65,7 +65,9 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         }
         try {
             val remote = repo.fetchFromApi(key)
-            repo.saveTasks(remote)
+            val local = tasks.value
+            val merged = mergeRemoteWithLocal(remote, local)
+            repo.saveTasks(merged)
         } catch (e: Exception) {
             lastError.value = e.message ?: "Sync failed"
         }
@@ -102,5 +104,11 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteTask(id: String) = viewModelScope.launch {
         val updated = tasks.value.filterNot { it.id == id }
         repo.saveTasks(updated)
+    }
+
+    private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>): List<TodoItem> {
+        val remoteIds = remote.map { it.id }.toSet()
+        val unsynced = local.filter { it.id.toIntOrNull() == null }
+        return remote + unsynced.filter { it.id !in remoteIds }
     }
 }
