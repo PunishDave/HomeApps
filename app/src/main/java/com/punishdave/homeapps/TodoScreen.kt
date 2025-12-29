@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -35,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -227,7 +229,8 @@ private fun TodoRow(
     onDelete: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
         color = TodoPanel,
         border = BorderStroke(1.dp, TodoAccent.copy(alpha = 0.35f))
@@ -236,37 +239,34 @@ private fun TodoRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 72.dp)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .clickable(
+                    role = Role.Checkbox,
+                    onClick = onToggle,
+                    indication = rememberRipple(bounded = true),
+                    interactionSource = remember { MutableInteractionSource() }
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Make the whole row tappable; checkbox remains the primary affordance.
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(role = Role.Checkbox, onClick = onToggle),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Checkbox(checked = task.done, onCheckedChange = { onToggle() })
+            Checkbox(checked = task.done, onCheckedChange = { onToggle() })
 
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = task.title,
+                    color = Color.White,
+                    fontWeight = if (task.done) FontWeight.Medium else FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                if (task.done) {
                     Text(
-                        text = task.title,
-                        color = Color.White,
-                        fontWeight = if (task.done) FontWeight.Medium else FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodyLarge
+                        text = "Completed",
+                        color = Color(0xFF7DD37D),
+                        style = MaterialTheme.typography.bodySmall
                     )
-                    if (task.done) {
-                        Text(
-                            text = "Completed",
-                            color = Color(0xFF7DD37D),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
                 }
             }
 
