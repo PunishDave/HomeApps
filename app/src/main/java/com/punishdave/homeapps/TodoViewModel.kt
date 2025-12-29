@@ -59,17 +59,25 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             if (it.id == id) it.copy(done = !it.done) else it
         }
 
-        // Optimistic local update
-        repo.saveTasks(updated)
+        if (key.isEmpty()) {
+            // Local only
+            repo.saveTasks(updated)
+            return@launch
+        }
 
-        // If we have an access key and a numeric id from server, push status change upstream
-        if (key.isNotEmpty()) {
-            runCatching {
-                val target = updated.firstOrNull { it.id == id } ?: return@runCatching
-                repo.updateStatusRemote(id, target.done, key)
-            }.onFailure { e ->
-                lastError.value = e.message ?: "Update failed"
+        runCatching {
+            val target = updated.firstOrNull { it.id == id } ?: return@runCatching
+            val remote = repo.updateStatusRemote(id, target.done, key)
+            val merged = if (remote != null) {
+                updated.map { if (it.id == id) remote else it }
+            } else {
+                updated
             }
+            repo.saveTasks(merged)
+        }.onFailure { e ->
+            lastError.value = e.message ?: "Update failed"
+            // fallback to optimistic local save
+            repo.saveTasks(updated)
         }
     }
 
