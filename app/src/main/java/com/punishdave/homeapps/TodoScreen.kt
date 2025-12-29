@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -230,28 +233,38 @@ private fun TodoRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(min = 72.dp)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Checkbox(checked = task.done, onCheckedChange = { onToggle() })
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Make the whole row tappable; checkbox remains the primary affordance.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(role = Role.Checkbox, onClick = onToggle),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = task.title,
-                    color = Color.White,
-                    fontWeight = if (task.done) FontWeight.Medium else FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                if (task.done) {
+                Checkbox(checked = task.done, onCheckedChange = { onToggle() })
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
-                        text = "Completed",
-                        color = Color(0xFF7DD37D),
-                        style = MaterialTheme.typography.bodySmall
+                        text = task.title,
+                        color = Color.White,
+                        fontWeight = if (task.done) FontWeight.Medium else FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyLarge
                     )
+                    if (task.done) {
+                        Text(
+                            text = "Completed",
+                            color = Color(0xFF7DD37D),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
 
