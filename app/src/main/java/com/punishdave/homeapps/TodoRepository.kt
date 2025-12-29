@@ -21,4 +21,14 @@ class TodoRepository(
             )
         }
     }
+
+    suspend fun updateStatusRemote(id: String, done: Boolean, key: String) {
+        val intId = id.toIntOrNull() ?: return
+        val status = if (done) "done" else "pending"
+        api.updateItem(
+            id = intId,
+            key = key,
+            body = mapOf("status" to status)
+        )
+    }
 }

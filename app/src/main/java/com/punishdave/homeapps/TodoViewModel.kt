@@ -54,10 +54,26 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggleTask(id: String) = viewModelScope.launch {
+        val key = accessKey.value.trim()
         val updated = tasks.value.map {
             if (it.id == id) it.copy(done = !it.done) else it
         }
+
+        // Optimistic local update
         repo.saveTasks(updated)
+
+        // If we have an access key and a numeric id from server, push status change upstream
+        if (key.isNotEmpty()) {
+            runCatching {
+                val target = updated.firstOrNull { it.id == id } ?: return@runCatching
+                repo.updateStatusRemote(id, target.done, key)
+                // Refresh from server to keep in sync
+                val remote = repo.fetchFromApi(key)
+                repo.saveTasks(remote)
+            }.onFailure { e ->
+                lastError.value = e.message ?: "Update failed"
+            }
+        }
     }
 
     fun deleteTask(id: String) = viewModelScope.launch {
