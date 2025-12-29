@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -38,6 +37,10 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    composeOptions {
+        // Compose compiler 1.7.2 is the Kotlin 2.0.21-compatible release
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
 }
 
