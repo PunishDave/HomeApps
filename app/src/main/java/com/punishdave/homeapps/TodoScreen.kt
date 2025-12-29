@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.EmojiPeople
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -63,6 +65,7 @@ fun TodoScreen(
     val habit by vm.habit.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
+    val listState = rememberLazyListState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = TodoBg) {
         Column(
@@ -90,6 +93,14 @@ fun TodoScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // Tasks section
+            Text(
+                text = "Tasks",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -124,8 +135,45 @@ fun TodoScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(14.dp))
+
+            if (tasks.isEmpty()) {
+                Text(
+                    text = "No tasks yet. Add something to get started.",
+                    color = Color(0xFFB0B0B0),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    items(
+                        items = tasks,
+                        key = { it.id }
+                    ) { task ->
+                        TodoRow(
+                            task = task,
+                            onToggle = { vm.toggleTask(task.id) },
+                            onDelete = { vm.deleteTask(task.id) }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Divider(color = TodoAccent.copy(alpha = 0.4f))
             Spacer(modifier = Modifier.height(12.dp))
 
+            // Settings / Sync section
+            Text(
+                text = "Settings & Sync",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -170,8 +218,26 @@ fun TodoScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Column {
+                            if (lastErr != null) {
+                                Text(
+                                    text = lastErr ?: "",
+                                    color = Color(0xFFFFB3B3),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            if (!lastSync.isNullOrEmpty()) {
+                                Text(
+                                    text = lastSync ?: "",
+                                    color = Color(0xFFBDBDBD),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+
                         FilledIconButton(
                             onClick = { vm.syncFromApi() },
                             colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
@@ -181,50 +247,6 @@ fun TodoScreen(
                         ) {
                             Icon(Icons.Filled.Sync, contentDescription = "Sync")
                         }
-                    }
-                }
-            }
-
-            if (lastErr != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = lastErr ?: "",
-                    color = Color(0xFFFFB3B3),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-            if (!lastSync.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = lastSync ?: "",
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (tasks.isEmpty()) {
-                Text(
-                    text = "No tasks yet. Add something to get started.",
-                    color = Color(0xFFB0B0B0),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(
-                        items = tasks,
-                        key = { it.id }
-                    ) { task ->
-                        TodoRow(
-                            task = task,
-                            onToggle = { vm.toggleTask(task.id) },
-                            onDelete = { vm.deleteTask(task.id) }
-                        )
                     }
                 }
             }
