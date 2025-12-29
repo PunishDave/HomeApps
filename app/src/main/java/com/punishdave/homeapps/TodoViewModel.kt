@@ -25,6 +25,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     val habit = repo.habitFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val newTaskText = MutableStateFlow("")
     val lastError = MutableStateFlow<String?>(null)
+    val lastSyncStatus = MutableStateFlow<String?>(null)
 
     fun addTask() = viewModelScope.launch {
         val title = newTaskText.value.trim()
@@ -74,6 +75,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         val key = accessKey.value.trim()
         if (key.isEmpty()) {
             lastError.value = "Enter the access key first."
+            lastSyncStatus.value = "Sync skipped: no access key."
             return@launch
         }
         try {
@@ -81,8 +83,11 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             val local = tasks.value
             val merged = mergeRemoteWithLocal(remote, local)
             repo.saveTasks(merged)
+            lastSyncStatus.value = "Synced ${remote.size} items from server; showing ${merged.size}."
         } catch (e: Exception) {
-            lastError.value = httpMessage(e, "Sync failed")
+            val msg = httpMessage(e, "Sync failed")
+            lastError.value = msg
+            lastSyncStatus.value = msg
         }
     }
 

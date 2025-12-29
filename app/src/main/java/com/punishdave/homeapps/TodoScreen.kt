@@ -17,6 +17,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -59,6 +61,7 @@ fun TodoScreen(
     val category by vm.category.collectAsState()
     val habit by vm.habit.collectAsState()
     val lastErr by vm.lastError.collectAsState()
+    val lastSync by vm.lastSyncStatus.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = TodoBg) {
         Column(
@@ -189,6 +192,14 @@ fun TodoScreen(
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+            if (!lastSync.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = lastSync ?: "",
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -226,6 +237,7 @@ private fun TodoRow(
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val interaction = remember { MutableInteractionSource() }
     Surface(
         modifier = Modifier
             .fillMaxWidth(),
@@ -239,6 +251,8 @@ private fun TodoRow(
                 .heightIn(min = 72.dp)
                 .padding(horizontal = 12.dp, vertical = 10.dp)
                 .clickable(
+                    interactionSource = interaction,
+                    indication = LocalIndication.current,
                     role = Role.Checkbox,
                     onClick = onToggle
                 ),
