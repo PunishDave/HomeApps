@@ -191,7 +191,10 @@ fun HomeAppsScreen(
                 onClick = {
                     mealVm.sync()
                     haveVm.refresh()
-                    todoVm.syncFromApi()
+                    // Only sync To-Do if an access key exists; otherwise keep local tasks
+                    if (todoVm.accessKey.value.isNotBlank()) {
+                        todoVm.syncFromApi()
+                    }
                 },
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = accent.copy(alpha = 0.6f),

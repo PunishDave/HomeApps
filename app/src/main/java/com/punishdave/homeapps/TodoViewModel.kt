@@ -107,6 +107,9 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>): List<TodoItem> {
+        // If the API returns nothing, keep current local state to avoid wiping UI.
+        if (remote.isEmpty()) return local
+
         val remoteIds = remote.map { it.id }.toSet()
         val unsynced = local.filter { it.id.toIntOrNull() == null }
         return remote + unsynced.filter { it.id !in remoteIds }
