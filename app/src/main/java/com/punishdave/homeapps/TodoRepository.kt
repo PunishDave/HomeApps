@@ -20,14 +20,20 @@ class TodoRepository(
     suspend fun fetchFromApi(key: String): List<TodoItem> {
         if (key.isBlank()) return emptyList()
         return withContext(Dispatchers.IO) {
-            val remote = api.listItems(key = key)
-            remote.map {
-                TodoItem(
-                    id = it.id.toString(),
-                    title = it.title,
-                    done = it.status.equals("done", ignoreCase = true)
+            val perPage = 100
+            val all = mutableListOf<TodoRemoteItem>()
+            var page = 1
+            while (true) {
+                val batch = api.listItems(
+                    key = key,
+                    perPage = perPage,
+                    page = page
                 )
+                all.addAll(batch)
+                if (batch.size < perPage) break
+                page += 1
             }
+            all.map { it.toLocal() }
         }
     }
 
@@ -41,11 +47,7 @@ class TodoRepository(
                 body = mapOf("status" to status)
             )
         }
-        return TodoItem(
-            id = remote.id.toString(),
-            title = remote.title,
-            done = remote.status.equals("done", ignoreCase = true)
-        )
+        return remote.toLocal()
     }
 
     suspend fun createRemote(title: String, key: String, category: String, habit: String): TodoItem? {
@@ -59,11 +61,13 @@ class TodoRepository(
                     if (habit.isNotBlank()) put("habit", habit)
                 }
             )
-            TodoItem(
-                id = remote.id.toString(),
-                title = remote.title,
-                done = remote.status.equals("done", ignoreCase = true)
-            )
+            remote.toLocal()
         }
     }
+
+    private fun TodoRemoteItem.toLocal(): TodoItem = TodoItem(
+        id = id.toString(),
+        title = title,
+        done = status.equals("done", ignoreCase = true)
+    )
 }

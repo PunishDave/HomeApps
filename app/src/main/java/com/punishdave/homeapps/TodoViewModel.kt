@@ -120,21 +120,23 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>): List<TodoItem> {
-        // If the API returns nothing, keep current local state to avoid wiping UI.
         if (remote.isEmpty()) return local
 
-        val remoteById = remote.associateBy { it.id }.toMutableMap()
+        val merged = mutableMapOf<String, TodoItem>()
 
-        // Prefer local status for items we already have (so toggles aren't undone immediately)
-        local.forEach { item ->
-            val r = remoteById[item.id]
-            if (r != null) {
-                remoteById[item.id] = r.copy(done = item.done)
+        // Start with remote as source of truth
+        remote.forEach { merged[it.id] = it }
+
+        // Overlay local state (preserve done state and keep locals that aren't returned)
+        local.forEach { localItem ->
+            val remoteItem = merged[localItem.id]
+            merged[localItem.id] = when {
+                remoteItem != null -> remoteItem.copy(done = localItem.done)
+                else -> localItem
             }
         }
 
-        val unsynced = local.filter { it.id.toIntOrNull() == null && it.id !in remoteById }
-        return remoteById.values.toList() + unsynced
+        return merged.values.toList()
     }
 
     private fun httpMessage(e: Throwable, fallback: String): String {
