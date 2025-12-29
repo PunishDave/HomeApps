@@ -67,9 +67,6 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             runCatching {
                 val target = updated.firstOrNull { it.id == id } ?: return@runCatching
                 repo.updateStatusRemote(id, target.done, key)
-                // Refresh from server to keep in sync
-                val remote = repo.fetchFromApi(key)
-                repo.saveTasks(remote)
             }.onFailure { e ->
                 lastError.value = e.message ?: "Update failed"
             }
