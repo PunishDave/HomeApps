@@ -45,6 +45,9 @@ android {
 }
 
 dependencies {
+    // Ensure the Compose compiler is on the Kotlin compiler classpath (avoids internal visibility errors)
+    add("kotlinCompilerPluginClasspath", "androidx.compose.compiler:compiler:${libs.versions.composeCompiler.get()}")
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
