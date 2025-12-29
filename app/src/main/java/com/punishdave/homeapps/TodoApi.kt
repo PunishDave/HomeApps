@@ -13,9 +13,9 @@ interface TodoApi {
         @Query("status") status: String? = null,
         @Query("due_on") dueOn: String? = null,
         @Query("due_after") dueAfter: String? = null,
-        @Query("order_by") orderBy: String? = "updated_at",
-        @Query("order") order: String? = "desc",
-        @Query("per_page") perPage: Int? = 200
+        @Query("orderby") orderBy: String? = "updated_at",
+        @Query("order") order: String? = "DESC",
+        @Query("per_page") perPage: Int? = 100
     ): List<TodoRemoteItem>
 }
 
