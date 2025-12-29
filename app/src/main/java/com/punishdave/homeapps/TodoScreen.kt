@@ -174,15 +174,14 @@ private fun SectionCard(
     subtitle: String,
     icon: @Composable () -> Unit,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val borderColor = if (selected) TodoAccent else TodoAccent.copy(alpha = 0.4f)
     val bg = if (selected) TodoPanel else Color(0xFF121212)
 
     Surface(
-        modifier = Modifier
-            .weight(1f)
-            .heightIn(min = 86.dp),
+        modifier = modifier.heightIn(min = 86.dp),
         shape = RoundedCornerShape(14.dp),
         color = bg,
         tonalElevation = 2.dp,
