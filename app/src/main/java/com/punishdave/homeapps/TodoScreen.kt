@@ -117,14 +117,16 @@ fun TodoScreen(
                     subtitle = "Add & check off items",
                     icon = { Icon(Icons.Filled.Checklist, contentDescription = null) },
                     selected = currentTab == TodoTab.Tasks,
-                    onClick = { currentTab = TodoTab.Tasks }
+                    onClick = { currentTab = TodoTab.Tasks },
+                    modifier = Modifier.weight(1f)
                 )
                 SectionCard(
                     title = "Settings",
                     subtitle = "Access key, sync, categories",
                     icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
                     selected = currentTab == TodoTab.Settings,
-                    onClick = { currentTab = TodoTab.Settings }
+                    onClick = { currentTab = TodoTab.Settings },
+                    modifier = Modifier.weight(1f)
                 )
             }
 
