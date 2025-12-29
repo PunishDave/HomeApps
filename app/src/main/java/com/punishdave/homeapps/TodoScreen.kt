@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -48,6 +49,7 @@ fun TodoScreen(
     val vm: TodoViewModel = viewModel()
     val tasks by vm.tasks.collectAsState()
     val newText by vm.newTaskText.collectAsState()
+    val accessKey by vm.accessKey.collectAsState()
     val lastErr by vm.lastError.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = TodoBg) {
@@ -106,6 +108,47 @@ fun TodoScreen(
                         )
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "Add task")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = TodoPanel,
+                border = BorderStroke(1.dp, TodoAccent.copy(alpha = 0.4f)),
+                tonalElevation = 2.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = accessKey,
+                        onValueChange = { vm.saveAccessKey(it) },
+                        singleLine = true,
+                        placeholder = { Text("Enter access key to sync with server") },
+                        label = { Text("Access Key") }
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        FilledIconButton(
+                            onClick = { vm.syncFromApi() },
+                            colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                                containerColor = TodoAccent,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Filled.Sync, contentDescription = "Sync")
+                        }
                     }
                 }
             }

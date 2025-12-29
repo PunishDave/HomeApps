@@ -14,6 +14,7 @@ private val Context.todoDataStore by preferencesDataStore(name = "todo_store")
 
 class ToDoStore(private val context: Context) {
     private val KEY_TASKS = stringPreferencesKey("todo_tasks_json")
+    private val KEY_ACCESS = stringPreferencesKey("todo_access_key")
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -27,7 +28,15 @@ class ToDoStore(private val context: Context) {
         runCatching { adapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
     }
 
+    val accessKeyFlow: Flow<String> = context.todoDataStore.data.map { prefs ->
+        prefs[KEY_ACCESS] ?: ""
+    }
+
     suspend fun saveTasks(tasks: List<TodoItem>) {
         context.todoDataStore.edit { it[KEY_TASKS] = adapter.toJson(tasks) }
+    }
+
+    suspend fun saveAccessKey(key: String) {
+        context.todoDataStore.edit { it[KEY_ACCESS] = key }
     }
 }

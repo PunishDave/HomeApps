@@ -131,6 +131,7 @@ fun HomeAppsScreen(
 ) {
     val mealVm: MealPlannerViewModel = viewModel()
     val haveVm: HaveWeGotViewModel = viewModel()
+    val todoVm: TodoViewModel = viewModel()
 
     val bg = Color(0xFF2A2A2A)
     val accent = Color(0xFFB00020)
@@ -190,6 +191,7 @@ fun HomeAppsScreen(
                 onClick = {
                     mealVm.sync()
                     haveVm.refresh()
+                    todoVm.syncFromApi()
                 },
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = accent.copy(alpha = 0.6f),

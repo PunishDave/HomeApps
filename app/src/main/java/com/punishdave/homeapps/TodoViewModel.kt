@@ -19,6 +19,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = TodoRepository(ToDoStore(app.applicationContext))
 
     val tasks = repo.tasksFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val newTaskText = MutableStateFlow("")
     val lastError = MutableStateFlow<String?>(null)
 
@@ -32,6 +33,24 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         val updated = listOf(TodoItem(title = title)) + tasks.value
         repo.saveTasks(updated)
         newTaskText.value = ""
+    }
+
+    fun saveAccessKey(key: String) = viewModelScope.launch {
+        repo.saveAccessKey(key.trim())
+    }
+
+    fun syncFromApi() = viewModelScope.launch {
+        val key = accessKey.value.trim()
+        if (key.isEmpty()) {
+            lastError.value = "Enter the access key first."
+            return@launch
+        }
+        try {
+            val remote = repo.fetchFromApi(key)
+            repo.saveTasks(remote)
+        } catch (e: Exception) {
+            lastError.value = e.message ?: "Sync failed"
+        }
     }
 
     fun toggleTask(id: String) = viewModelScope.launch {
