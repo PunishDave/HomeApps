@@ -28,6 +28,13 @@ interface TodoApi {
         @Query("pd_todo_key") keyQuery: String? = key,
         @Body body: Map<String, String>
     ): TodoRemoteItem
+
+    @POST("items")
+    suspend fun createItem(
+        @Header("X-PD-Todo-Key") key: String?,
+        @Query("pd_todo_key") keyQuery: String? = key,
+        @Body body: Map<String, String>
+    ): TodoRemoteItem
 }
 
 @JsonClass(generateAdapter = true)

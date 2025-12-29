@@ -175,7 +175,10 @@ fun TodoScreen(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(tasks) { task ->
+                    items(
+                        items = tasks,
+                        key = { it.id }
+                    ) { task ->
                         TodoRow(
                             task = task,
                             onToggle = { vm.toggleTask(task.id) },

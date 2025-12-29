@@ -43,4 +43,19 @@ class TodoRepository(
             done = remote.status.equals("done", ignoreCase = true)
         )
     }
+
+    suspend fun createRemote(title: String, key: String): TodoItem? {
+        if (title.isBlank()) return null
+        return withContext(Dispatchers.IO) {
+            val remote = api.createItem(
+                key = key,
+                body = mapOf("title" to title)
+            )
+            TodoItem(
+                id = remote.id.toString(),
+                title = remote.title,
+                done = remote.status.equals("done", ignoreCase = true)
+            )
+        }
+    }
 }

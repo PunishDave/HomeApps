@@ -30,9 +30,27 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
 
-        val updated = listOf(TodoItem(title = title)) + tasks.value
-        repo.saveTasks(updated)
-        newTaskText.value = ""
+        val key = accessKey.value.trim()
+
+        if (key.isEmpty()) {
+            val updated = listOf(TodoItem(title = title)) + tasks.value
+            repo.saveTasks(updated)
+            newTaskText.value = ""
+            return@launch
+        }
+
+        // Try remote create; fall back to local
+        runCatching {
+            val remote = repo.createRemote(title, key)
+            val merged = if (remote != null) listOf(remote) + tasks.value else listOf(TodoItem(title = title)) + tasks.value
+            repo.saveTasks(merged)
+            newTaskText.value = ""
+        }.onFailure { e ->
+            lastError.value = e.message ?: "Add failed"
+            val updated = listOf(TodoItem(title = title)) + tasks.value
+            repo.saveTasks(updated)
+            newTaskText.value = ""
+        }
     }
 
     fun saveAccessKey(key: String) = viewModelScope.launch {
