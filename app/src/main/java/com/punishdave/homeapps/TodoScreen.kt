@@ -1,37 +1,40 @@
 package com.punishdave.homeapps
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiPeople
-import androidx.compose.material3.Divider
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -39,32 +42,38 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 private val TodoBg = Color(0xFF1C1C1C)
 private val TodoPanel = Color(0xFF0F0F0F)
 private val TodoAccent = Color(0xFFB00020)
 
+private enum class TodoTab { Tasks, Settings }
+
 @Composable
 fun TodoScreen(
     onBack: () -> Unit
-)
-{
+) {
     val vm: TodoViewModel = viewModel()
     val tasks by vm.tasks.collectAsState()
-    val newText by vm.newTaskText.collectAsState()
+    val newTaskText by vm.newTaskText.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
     val category by vm.category.collectAsState()
     val habit by vm.habit.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
+    var currentTab by rememberSaveable { mutableStateOf(TodoTab.Tasks) }
     val listState = rememberLazyListState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = TodoBg) {
@@ -80,7 +89,11 @@ fun TodoScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color(0xFFBDBDBD))
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color(0xFFBDBDBD)
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -93,39 +106,159 @@ fun TodoScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Tasks section
-            Text(
-                text = "Tasks",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Surface(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = TodoPanel,
-                border = BorderStroke(1.dp, TodoAccent.copy(alpha = 0.4f)),
-                tonalElevation = 2.dp
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                SectionCard(
+                    title = "Tasks",
+                    subtitle = "Add & check off items",
+                    icon = { Icon(Icons.Filled.Checklist, contentDescription = null) },
+                    selected = currentTab == TodoTab.Tasks,
+                    onClick = { currentTab = TodoTab.Tasks }
+                )
+                SectionCard(
+                    title = "Settings",
+                    subtitle = "Access key, sync, categories",
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                    selected = currentTab == TodoTab.Settings,
+                    onClick = { currentTab = TodoTab.Settings }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            when (currentTab) {
+                TodoTab.Tasks -> TasksSection(
+                    tasks = tasks,
+                    newTaskText = newTaskText,
+                    listState = listState,
+                    onChangeNewTask = { vm.newTaskText.value = it },
+                    onAdd = { vm.addTask() },
+                    onToggle = { vm.toggleTask(it) },
+                    onDelete = { vm.deleteTask(it) }
+                )
+
+                TodoTab.Settings -> SettingsSection(
+                    accessKey = accessKey,
+                    category = category,
+                    habit = habit,
+                    lastErr = lastErr,
+                    lastSync = lastSync,
+                    onAccessKeyChange = { vm.saveAccessKey(it) },
+                    onCategoryChange = { vm.saveCategory(it) },
+                    onHabitChange = { vm.saveHabit(it) },
+                    onSync = { vm.syncFromApi() }
+                )
+            }
+
+            if (currentTab == TodoTab.Tasks && lastErr != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = lastErr ?: "",
+                    color = Color(0xFFFF9B9B),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionCard(
+    title: String,
+    subtitle: String,
+    icon: @Composable () -> Unit,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (selected) TodoAccent else TodoAccent.copy(alpha = 0.4f)
+    val bg = if (selected) TodoPanel else Color(0xFF121212)
+
+    Surface(
+        modifier = Modifier
+            .weight(1f)
+            .heightIn(min = 86.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = bg,
+        tonalElevation = 2.dp,
+        border = BorderStroke(1.dp, borderColor),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            icon()
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = subtitle,
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TasksSection(
+    tasks: List<TodoItem>,
+    newTaskText: String,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onChangeNewTask: (String) -> Unit,
+    onAdd: () -> Unit,
+    onToggle: (String) -> Unit,
+    onDelete: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = TodoPanel,
+            border = BorderStroke(1.dp, TodoAccent.copy(alpha = 0.4f)),
+            tonalElevation = 2.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Add a task",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
                         modifier = Modifier.weight(1f),
-                        value = newText,
-                        onValueChange = { vm.newTaskText.value = it },
+                        value = newTaskText,
+                        onValueChange = onChangeNewTask,
                         singleLine = true,
-                        placeholder = { Text("Add a task") }
+                        label = { Text("Task name") }
                     )
-
                     FilledIconButton(
-                        onClick = { vm.addTask() },
-                        colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                        onClick = onAdd,
+                        colors = IconButtonDefaults.filledIconButtonColors(
                             containerColor = TodoAccent,
                             contentColor = Color.White
                         )
@@ -134,121 +267,134 @@ fun TodoScreen(
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            if (tasks.isEmpty()) {
+        if (tasks.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "No tasks yet. Add something to get started.",
+                    text = "No tasks yet. Add your first one above.",
                     color = Color(0xFFB0B0B0),
                     style = MaterialTheme.typography.bodyMedium
                 )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp)
-                ) {
-                    items(
-                        items = tasks,
-                        key = { it.id }
-                    ) { task ->
-                        TodoRow(
-                            task = task,
-                            onToggle = { vm.toggleTask(task.id) },
-                            onDelete = { vm.deleteTask(task.id) }
-                        )
-                    }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 96.dp)
+            ) {
+                items(
+                    items = tasks,
+                    key = { it.id }
+                ) { task ->
+                    TodoRow(
+                        task = task,
+                        onToggle = { onToggle(task.id) },
+                        onDelete = { onDelete(task.id) }
+                    )
                 }
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(20.dp))
-            Divider(color = TodoAccent.copy(alpha = 0.4f))
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Settings / Sync section
+@Composable
+private fun SettingsSection(
+    accessKey: String,
+    category: String,
+    habit: String,
+    lastErr: String?,
+    lastSync: String?,
+    onAccessKeyChange: (String) -> Unit,
+    onCategoryChange: (String) -> Unit,
+    onHabitChange: (String) -> Unit,
+    onSync: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(12.dp),
+        color = TodoPanel,
+        border = BorderStroke(1.dp, TodoAccent.copy(alpha = 0.4f)),
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Text(
-                text = "Settings & Sync",
+                text = "Sync & API",
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Surface(
+
+            OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = TodoPanel,
-                border = BorderStroke(1.dp, TodoAccent.copy(alpha = 0.4f)),
-                tonalElevation = 2.dp
+                value = accessKey,
+                onValueChange = onAccessKeyChange,
+                singleLine = true,
+                label = { Text("Access key") }
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = category,
+                onValueChange = onCategoryChange,
+                singleLine = true,
+                label = { Text("Category (optional)") },
+                leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null) }
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = habit,
+                onValueChange = onHabitChange,
+                singleLine = true,
+                label = { Text("Habit (optional)") },
+                leadingIcon = { Icon(Icons.Filled.EmojiPeople, contentDescription = null) }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                FilledIconButton(
+                    onClick = onSync,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = TodoAccent,
+                        contentColor = Color.White
+                    )
                 ) {
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = accessKey,
-                        onValueChange = { vm.saveAccessKey(it) },
-                        singleLine = true,
-                        placeholder = { Text("Enter access key to sync with server") },
-                        label = { Text("Access Key") }
-                    )
-
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = category,
-                        onValueChange = { vm.saveCategory(it) },
-                        singleLine = true,
-                        placeholder = { Text("Category (must match WP To-Do > Categories)") },
-                        label = { Text("Category") },
-                        leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null) }
-                    )
-
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = habit,
-                        onValueChange = { vm.saveHabit(it) },
-                        singleLine = true,
-                        placeholder = { Text("Habit (optional, must match WP To-Do > Habits)") },
-                        label = { Text("Habit") },
-                        leadingIcon = { Icon(Icons.Filled.EmojiPeople, contentDescription = null) }
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            if (lastErr != null) {
-                                Text(
-                                    text = lastErr ?: "",
-                                    color = Color(0xFFFFB3B3),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (!lastSync.isNullOrEmpty()) {
-                                Text(
-                                    text = lastSync ?: "",
-                                    color = Color(0xFFBDBDBD),
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-
-                        FilledIconButton(
-                            onClick = { vm.syncFromApi() },
-                            colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                                containerColor = TodoAccent,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(Icons.Filled.Sync, contentDescription = "Sync")
-                        }
-                    }
+                    Icon(Icons.Filled.Sync, contentDescription = "Sync")
                 }
+            }
+
+            if (lastErr != null) {
+                Text(
+                    text = lastErr,
+                    color = Color(0xFFFF9B9B),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (!lastSync.isNullOrBlank()) {
+                Text(
+                    text = lastSync,
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                Text(
+                    text = "Not synced yet. Enter the access key and press Sync.",
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
@@ -260,11 +406,9 @@ private fun TodoRow(
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val interaction = remember { MutableInteractionSource() }
     Surface(
-        modifier = Modifier
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
         color = TodoPanel,
         border = BorderStroke(1.dp, TodoAccent.copy(alpha = 0.35f))
     ) {
@@ -272,33 +416,35 @@ private fun TodoRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 72.dp)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
                 .clickable(
-                    interactionSource = interaction,
+                    interactionSource = remember { MutableInteractionSource() },
                     indication = LocalIndication.current,
                     role = Role.Checkbox,
                     onClick = onToggle
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Checkbox(checked = task.done, onCheckedChange = { onToggle() })
+            Checkbox(
+                checked = task.done,
+                onCheckedChange = { onToggle() }
+            )
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = task.title,
                     color = Color.White,
-                    fontWeight = if (task.done) FontWeight.Medium else FontWeight.SemiBold,
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (task.done) {
                     Text(
                         text = "Completed",
-                        color = Color(0xFF7DD37D),
-                        style = MaterialTheme.typography.bodySmall
+                        color = TodoAccent,
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
             }
