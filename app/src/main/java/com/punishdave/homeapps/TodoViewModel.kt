@@ -21,6 +21,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
     val tasks = repo.tasksFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val category = repo.categoryFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val habit = repo.habitFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val newTaskText = MutableStateFlow("")
     val lastError = MutableStateFlow<String?>(null)
 
@@ -32,6 +34,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         val key = accessKey.value.trim()
+        val cat = category.value.trim()
+        val hab = habit.value.trim()
 
         if (key.isEmpty()) {
             val updated = listOf(TodoItem(title = title)) + tasks.value
@@ -42,7 +46,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
         // Try remote create; fall back to local
         runCatching {
-            val remote = repo.createRemote(title, key)
+            val remote = repo.createRemote(title, key, cat, hab)
             val merged = if (remote != null) listOf(remote) + tasks.value else listOf(TodoItem(title = title)) + tasks.value
             repo.saveTasks(merged)
             newTaskText.value = ""
@@ -56,6 +60,14 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveAccessKey(key: String) = viewModelScope.launch {
         repo.saveAccessKey(key.trim())
+    }
+
+    fun saveCategory(cat: String) = viewModelScope.launch {
+        repo.saveCategory(cat.trim())
+    }
+
+    fun saveHabit(habit: String) = viewModelScope.launch {
+        repo.saveHabit(habit.trim())
     }
 
     fun syncFromApi() = viewModelScope.launch {

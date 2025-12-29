@@ -19,6 +19,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.EmojiPeople
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -50,6 +52,8 @@ fun TodoScreen(
     val tasks by vm.tasks.collectAsState()
     val newText by vm.newTaskText.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
+    val category by vm.category.collectAsState()
+    val habit by vm.habit.collectAsState()
     val lastErr by vm.lastError.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = TodoBg) {
@@ -134,6 +138,26 @@ fun TodoScreen(
                         singleLine = true,
                         placeholder = { Text("Enter access key to sync with server") },
                         label = { Text("Access Key") }
+                    )
+
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = category,
+                        onValueChange = { vm.saveCategory(it) },
+                        singleLine = true,
+                        placeholder = { Text("Category (must match WP To-Do > Categories)") },
+                        label = { Text("Category") },
+                        leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null) }
+                    )
+
+                    OutlinedTextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        value = habit,
+                        onValueChange = { vm.saveHabit(it) },
+                        singleLine = true,
+                        placeholder = { Text("Habit (optional, must match WP To-Do > Habits)") },
+                        label = { Text("Habit") },
+                        leadingIcon = { Icon(Icons.Filled.EmojiPeople, contentDescription = null) }
                     )
 
                     Row(

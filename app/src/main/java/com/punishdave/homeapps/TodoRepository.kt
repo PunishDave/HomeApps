@@ -9,9 +9,13 @@ class TodoRepository(
 ) {
     fun tasksFlow() = store.tasksFlow
     fun accessKeyFlow() = store.accessKeyFlow
+    fun categoryFlow() = store.categoryFlow
+    fun habitFlow() = store.habitFlow
 
     suspend fun saveTasks(tasks: List<TodoItem>) = withContext(Dispatchers.IO) { store.saveTasks(tasks) }
     suspend fun saveAccessKey(key: String) = withContext(Dispatchers.IO) { store.saveAccessKey(key) }
+    suspend fun saveCategory(cat: String) = withContext(Dispatchers.IO) { store.saveCategory(cat) }
+    suspend fun saveHabit(habit: String) = withContext(Dispatchers.IO) { store.saveHabit(habit) }
 
     suspend fun fetchFromApi(key: String): List<TodoItem> {
         if (key.isBlank()) return emptyList()
@@ -44,12 +48,16 @@ class TodoRepository(
         )
     }
 
-    suspend fun createRemote(title: String, key: String): TodoItem? {
+    suspend fun createRemote(title: String, key: String, category: String, habit: String): TodoItem? {
         if (title.isBlank()) return null
         return withContext(Dispatchers.IO) {
             val remote = api.createItem(
                 key = key,
-                body = mapOf("title" to title)
+                body = buildMap {
+                    put("title", title)
+                    if (category.isNotBlank()) put("category", category)
+                    if (habit.isNotBlank()) put("habit", habit)
+                }
             )
             TodoItem(
                 id = remote.id.toString(),
