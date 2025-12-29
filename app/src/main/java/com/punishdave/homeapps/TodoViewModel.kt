@@ -3,6 +3,7 @@ package com.punishdave.homeapps
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import retrofit2.HttpException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -69,7 +70,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             val merged = mergeRemoteWithLocal(remote, local)
             repo.saveTasks(merged)
         } catch (e: Exception) {
-            lastError.value = e.message ?: "Sync failed"
+            lastError.value = httpMessage(e, "Sync failed")
         }
     }
 
@@ -95,7 +96,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             }
             repo.saveTasks(merged)
         }.onFailure { e ->
-            lastError.value = e.message ?: "Update failed"
+            lastError.value = httpMessage(e, "Update failed")
             // fallback to optimistic local save
             repo.saveTasks(updated)
         }
@@ -110,8 +111,25 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         // If the API returns nothing, keep current local state to avoid wiping UI.
         if (remote.isEmpty()) return local
 
-        val remoteIds = remote.map { it.id }.toSet()
-        val unsynced = local.filter { it.id.toIntOrNull() == null }
-        return remote + unsynced.filter { it.id !in remoteIds }
+        val remoteById = remote.associateBy { it.id }.toMutableMap()
+
+        // Prefer local status for items we already have (so toggles aren't undone immediately)
+        local.forEach { item ->
+            val r = remoteById[item.id]
+            if (r != null) {
+                remoteById[item.id] = r.copy(done = item.done)
+            }
+        }
+
+        val unsynced = local.filter { it.id.toIntOrNull() == null && it.id !in remoteById }
+        return remoteById.values.toList() + unsynced
+    }
+
+    private fun httpMessage(e: Throwable, fallback: String): String {
+        return if (e is HttpException) {
+            "HTTP ${e.code()}: ${e.message()}"
+        } else {
+            e.message ?: fallback
+        }
     }
 }
