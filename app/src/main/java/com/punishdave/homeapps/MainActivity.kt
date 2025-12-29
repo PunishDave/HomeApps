@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Inventory2
@@ -29,6 +30,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 private sealed class Route(val id: String) {
     data object Home : Route("home")
@@ -127,6 +129,9 @@ fun HomeAppsScreen(
     onOpenTodo: () -> Unit,
     onOpenWorkoutLog: () -> Unit
 ) {
+    val mealVm: MealPlannerViewModel = viewModel()
+    val haveVm: HaveWeGotViewModel = viewModel()
+
     val bg = Color(0xFF2A2A2A)
     val accent = Color(0xFFB00020)
 
@@ -180,6 +185,23 @@ fun HomeAppsScreen(
             )
 
             Spacer(modifier = Modifier.height(28.dp))
+
+            FilledTonalButton(
+                onClick = {
+                    mealVm.sync()
+                    haveVm.refresh()
+                },
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = accent.copy(alpha = 0.6f),
+                    contentColor = Color.White
+                )
+            ) {
+                Icon(Icons.Filled.Sync, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Sync All")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             HomeAppsGrid(cards = cards, accent = accent)
         }

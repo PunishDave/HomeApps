@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -14,12 +15,16 @@ private val Context.workoutDataStore by preferencesDataStore(name = "workout_sto
 class WorkoutStore(private val context: Context) {
     private val KEY_ENTRIES = stringPreferencesKey("workout_entries_json")
 
-    private val moshi: Moshi = Moshi.Builder().build()
+    private val moshi: Moshi = Moshi.Builder()
+        .add(KotlinJsonAdapterFactory())
+        .build()
     private val listType = Types.newParameterizedType(List::class.java, WorkoutEntry::class.java)
     private val adapter = moshi.adapter<List<WorkoutEntry>>(listType)
 
     val entriesFlow: Flow<List<WorkoutEntry>> = context.workoutDataStore.data.map { prefs ->
-        prefs[KEY_ENTRIES]?.let { adapter.fromJson(it) } ?: emptyList()
+        val raw = prefs[KEY_ENTRIES]
+        if (raw.isNullOrEmpty()) return@map emptyList()
+        runCatching { adapter.fromJson(raw) }.getOrElse { emptyList() }
     }
 
     suspend fun saveEntries(entries: List<WorkoutEntry>) {
