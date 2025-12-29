@@ -24,7 +24,7 @@ class ToDoStore(private val context: Context) {
     val tasksFlow: Flow<List<TodoItem>> = context.todoDataStore.data.map { prefs ->
         val raw = prefs[KEY_TASKS]
         if (raw.isNullOrEmpty()) return@map emptyList()
-        runCatching { adapter.fromJson(raw) }.getOrElse { emptyList() }
+        runCatching { adapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
     }
 
     suspend fun saveTasks(tasks: List<TodoItem>) {

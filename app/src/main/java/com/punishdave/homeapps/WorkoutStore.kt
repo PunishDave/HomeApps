@@ -24,7 +24,7 @@ class WorkoutStore(private val context: Context) {
     val entriesFlow: Flow<List<WorkoutEntry>> = context.workoutDataStore.data.map { prefs ->
         val raw = prefs[KEY_ENTRIES]
         if (raw.isNullOrEmpty()) return@map emptyList()
-        runCatching { adapter.fromJson(raw) }.getOrElse { emptyList() }
+        runCatching { adapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
     }
 
     suspend fun saveEntries(entries: List<WorkoutEntry>) {
