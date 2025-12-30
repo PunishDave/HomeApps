@@ -101,8 +101,6 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun syncFromApi() = viewModelScope.launch {
         val key = accessKey.value.trim()
-        val cat = category.value.trim()
-        val hab = habit.value.trim()
         if (key.isEmpty()) {
             lastError.value = "Enter the access key first."
             lastSyncStatus.value = "Sync skipped: no access key."
@@ -112,19 +110,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         lastSyncStatus.value = "Syncing..."
         try {
             val localBefore = tasks.value
-            val initialRemote = repo.fetchFromApi(key)
-
-            // Decide what to push: anything without a numeric id or not present remotely by id/title.
-            val toPush = localBefore.filter { item ->
-                val isNumericId = item.id.all { it.isDigit() } && item.id.isNotBlank()
-                val existsRemote = initialRemote.any {
-                    it.id == item.id || it.title.equals(item.title, ignoreCase = true)
-                }
-                !isNumericId || !existsRemote
-            }
-
-            val pushedResult = repo.pushItems(toPush, key, cat, hab)
-            val remote = if (pushedResult.created.isNotEmpty()) repo.fetchFromApi(key) else initialRemote
+            val remote = repo.fetchFromApi(key)
             val (cats, habits) = repo.fetchMeta(key)
             val merged = mergeRemoteWithLocal(remote, localBefore)
             repo.saveTasks(merged)
@@ -135,9 +121,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            val failedCount = pushedResult.failed.size
-            val failedPushMsg = if (failedCount > 0) " (failed to push $failedCount)" else ""
-            lastSyncStatus.value = "Synced ${remote.size} items; pushed ${pushedResult.created.size}$failedPushMsg; categories ${cats.size}; habits ${habits.size}."
+            lastSyncStatus.value = "Synced ${remote.size} items; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg
