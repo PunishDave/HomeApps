@@ -138,10 +138,12 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            val ids = remoteLatest.joinToString(",") { it.id }
+            val idsSaved = remoteLatest.joinToString(",") { it.id }
+            val idsInitial = remoteInitial.joinToString(",") { it.id }
+            val idsAfterPush = remoteAfterPush.joinToString(",") { it.id }
             val failedCount = pushed.failed.size
             val failedMsg = if (failedCount > 0) " (failed to push $failedCount)" else ""
-            lastSyncStatus.value = "Synced ${remoteLatest.size} items [ids: $ids]; pushed ${pushed.created.size}$failedMsg; categories ${cats.size}; habits ${habits.size}."
+            lastSyncStatus.value = "Synced ${remoteLatest.size} items [saved ids: $idsSaved; initial: $idsInitial; after push: $idsAfterPush]; pushed ${pushed.created.size}$failedMsg; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg
