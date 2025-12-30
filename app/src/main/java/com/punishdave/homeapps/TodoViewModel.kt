@@ -112,22 +112,37 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         lastSyncStatus.value = "Syncing..."
         try {
             val localBefore = tasks.value
-            val remote = repo.fetchFromApi(key)
+            val remoteInitial = repo.fetchFromApi(key)
 
             // Push new local items that do not have numeric IDs.
             val newLocal = localBefore.filter { item ->
                 item.id.isBlank() || item.id.any { ch -> !ch.isDigit() }
             }
             val pushed = repo.pushItems(newLocal, key, cat, hab)
-            val remoteAfterPush = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else remote
-            val remoteLatest = if (remoteAfterPush.isNotEmpty()) remoteAfterPush else remote + pushed.created
+            val remoteAfterPush = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else emptyList()
+
+            // Decide final remote: prefer post-push fetch; if empty, fall back to initial.
+            val remoteLatest = if (remoteAfterPush.isNotEmpty()) remoteAfterPush else remoteInitial
 
             val (cats, habits) = repo.fetchMeta(key)
             repo.clearTasks()
             val failedExtras = pushed.failed.filter { it.id.isBlank() || it.id.any { ch -> !ch.isDigit() } }
-            // Deduplicate by id to avoid double entries if fallback combined lists.
-            val merged = (remoteLatest + failedExtras).associateBy { it.id.ifBlank { it.title.lowercase() } }.values.toList()
-            repo.saveTasks(merged)
+
+            // Preserve completion/due where ids match.
+            val localMap = localBefore.associateBy { it.id }
+            val mergedRemote = remoteLatest.map { remoteItem ->
+                val localItem = localMap[remoteItem.id]
+                if (localItem != null) {
+                    remoteItem.copy(
+                        done = localItem.done,
+                        dueDate = remoteItem.dueDate ?: localItem.dueDate
+                    )
+                } else {
+                    remoteItem
+                }
+            }
+
+            repo.saveTasks(mergedRemote + failedExtras)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
