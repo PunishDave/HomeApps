@@ -13,7 +13,8 @@ import java.util.UUID
 data class TodoItem(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
-    val done: Boolean = false
+    val done: Boolean = false,
+    val dueDate: String? = null
 )
 
 class TodoViewModel(app: Application) : AndroidViewModel(app) {
@@ -26,6 +27,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     val categoryOptions = repo.categoryOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val habitOptions = repo.habitOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val newTaskText = MutableStateFlow("")
+    val dueDateText = MutableStateFlow(java.time.LocalDate.now().toString())
     val lastError = MutableStateFlow<String?>(null)
     val lastSyncStatus = MutableStateFlow<String?>(null)
 
@@ -39,25 +41,48 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         val key = accessKey.value.trim()
         val cat = category.value.trim()
         val hab = habit.value.trim()
+        val due = dueDateText.value.trim()
 
         if (key.isEmpty()) {
-            val updated = listOf(TodoItem(title = title)) + tasks.value
+            val updated = listOf(
+                TodoItem(
+                    title = title,
+                    dueDate = due.ifEmpty { null }
+                )
+            ) + tasks.value
             repo.saveTasks(updated)
             newTaskText.value = ""
+            dueDateText.value = java.time.LocalDate.now().toString()
             return@launch
         }
 
         // Try remote create; fall back to local
         runCatching {
-            val remote = repo.createRemote(title, key, cat, hab)
-            val merged = if (remote != null) listOf(remote) + tasks.value else listOf(TodoItem(title = title)) + tasks.value
+            val remote = repo.createRemote(title, key, cat, hab, due)
+            val merged = if (remote != null) {
+                listOf(remote) + tasks.value
+            } else {
+                listOf(
+                    TodoItem(
+                        title = title,
+                        dueDate = due.ifEmpty { null }
+                    )
+                ) + tasks.value
+            }
             repo.saveTasks(merged)
             newTaskText.value = ""
+            dueDateText.value = java.time.LocalDate.now().toString()
         }.onFailure { e ->
             lastError.value = e.message ?: "Add failed"
-            val updated = listOf(TodoItem(title = title)) + tasks.value
+            val updated = listOf(
+                TodoItem(
+                    title = title,
+                    dueDate = due.ifEmpty { null }
+                )
+            ) + tasks.value
             repo.saveTasks(updated)
             newTaskText.value = ""
+            dueDateText.value = java.time.LocalDate.now().toString()
         }
     }
 
@@ -146,7 +171,10 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         local.forEach { localItem ->
             val remoteItem = merged[localItem.id]
             merged[localItem.id] = when {
-                remoteItem != null -> remoteItem.copy(done = localItem.done)
+                remoteItem != null -> remoteItem.copy(
+                    done = localItem.done,
+                    dueDate = remoteItem.dueDate ?: localItem.dueDate
+                )
                 else -> localItem
             }
         }

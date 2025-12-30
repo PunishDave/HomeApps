@@ -65,7 +65,7 @@ class TodoRepository(
         return remote.toLocal()
     }
 
-    suspend fun createRemote(title: String, key: String, category: String, habit: String): TodoItem? {
+    suspend fun createRemote(title: String, key: String, category: String, habit: String, dueDate: String): TodoItem? {
         if (title.isBlank()) return null
         return withContext(Dispatchers.IO) {
             val remote = api.createItem(
@@ -74,6 +74,7 @@ class TodoRepository(
                     put("title", title)
                     if (category.isNotBlank()) put("category", category)
                     if (habit.isNotBlank()) put("habit", habit)
+                    if (dueDate.isNotBlank()) put("due_date", dueDate)
                 }
             )
             remote.toLocal()
@@ -83,6 +84,7 @@ class TodoRepository(
     private fun TodoRemoteItem.toLocal(): TodoItem = TodoItem(
         id = id.toString(),
         title = title,
-        done = status.equals("done", ignoreCase = true)
+        done = status.equals("done", ignoreCase = true),
+        dueDate = due_date
     )
 }

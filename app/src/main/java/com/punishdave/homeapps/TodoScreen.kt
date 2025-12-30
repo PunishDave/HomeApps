@@ -81,6 +81,7 @@ fun TodoScreen(
     val habit by vm.habit.collectAsState()
     val categoryOptions by vm.categoryOptions.collectAsState()
     val habitOptions by vm.habitOptions.collectAsState()
+    val dueDate by vm.dueDateText.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
     var currentTab by rememberSaveable { mutableStateOf(TodoTab.Tasks) }
@@ -140,8 +141,10 @@ fun TodoScreen(
                 TodoTab.Tasks -> TasksSection(
                     tasks = tasks,
                     newTaskText = newTaskText,
+                    dueDateText = dueDate,
                     listState = listState,
                     onChangeNewTask = { vm.newTaskText.value = it },
+                    onChangeDueDate = { vm.dueDateText.value = it },
                     onAdd = { vm.addTask() },
                     onToggle = { vm.toggleTask(it) },
                     onDelete = { vm.deleteTask(it) }
@@ -225,8 +228,10 @@ private fun SectionCard(
 private fun TasksSection(
     tasks: List<TodoItem>,
     newTaskText: String,
+    dueDateText: String,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onChangeNewTask: (String) -> Unit,
+    onChangeDueDate: (String) -> Unit,
     onAdd: () -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit
@@ -264,6 +269,13 @@ private fun TasksSection(
                         onValueChange = onChangeNewTask,
                         singleLine = true,
                         label = { Text("Task name") }
+                    )
+                    OutlinedTextField(
+                        modifier = Modifier.weight(1f),
+                        value = dueDateText,
+                        onValueChange = onChangeDueDate,
+                        singleLine = true,
+                        label = { Text("Due date (YYYY-MM-DD)") }
                     )
                     FilledIconButton(
                         onClick = onAdd,
@@ -532,7 +544,10 @@ private fun TodoRow(
                 onCheckedChange = { onToggle() }
             )
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 Text(
                     text = task.title,
                     color = Color.White,
@@ -541,6 +556,13 @@ private fun TodoRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                task.dueDate?.takeIf { it.isNotBlank() }?.let { due ->
+                    Text(
+                        text = "Due: $due",
+                        color = Color(0xFFBDBDBD),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
                 if (task.done) {
                     Text(
                         text = "Completed",
