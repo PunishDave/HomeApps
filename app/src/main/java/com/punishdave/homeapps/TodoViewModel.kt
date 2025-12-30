@@ -119,18 +119,22 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 item.id.isBlank() || item.id.any { ch -> !ch.isDigit() }
             }
             val pushed = repo.pushItems(newLocal, key, cat, hab)
-            val remoteAfterPush = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else emptyList()
+            val remoteAfterPush = if (pushed.created.isNotEmpty()) {
+                repo.fetchFromApi(key)
+            } else {
+                TodoRepository.FetchResult(emptyList(), "skip-push")
+            }
 
             // Decide final remote: prefer post-push fetch; if empty, fall back to initial + created.
-            val remoteLatest = when {
-                remoteAfterPush.isNotEmpty() -> remoteAfterPush
-                pushed.created.isNotEmpty() -> remoteInitial + pushed.created
-                else -> remoteInitial
+            val remoteLatestItems = when {
+                remoteAfterPush.items.isNotEmpty() -> remoteAfterPush.items
+                pushed.created.isNotEmpty() -> remoteInitial.items + pushed.created
+                else -> remoteInitial.items
             }
 
             val (cats, habits) = repo.fetchMeta(key)
             repo.clearTasks()
-            repo.saveTasks(remoteLatest)
+            repo.saveTasks(remoteLatestItems)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
@@ -138,12 +142,12 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            val idsSaved = remoteLatest.joinToString(",") { it.id }
-            val idsInitial = remoteInitial.joinToString(",") { it.id }
-            val idsAfterPush = remoteAfterPush.joinToString(",") { it.id }
+            val idsSaved = remoteLatestItems.joinToString(",") { it.id }
+            val idsInitial = remoteInitial.items.joinToString(",") { it.id }
+            val idsAfterPush = remoteAfterPush.items.joinToString(",") { it.id }
             val failedCount = pushed.failed.size
             val failedMsg = if (failedCount > 0) " (failed to push $failedCount)" else ""
-            lastSyncStatus.value = "Synced ${remoteLatest.size} items [saved ids: $idsSaved; initial: $idsInitial; after push: $idsAfterPush]; pushed ${pushed.created.size}$failedMsg; categories ${cats.size}; habits ${habits.size}."
+            lastSyncStatus.value = "Synced ${remoteLatestItems.size} items [saved ids: $idsSaved; initial: $idsInitial; after push: $idsAfterPush]; pushed ${pushed.created.size}$failedMsg; categories ${cats.size}; habits ${habits.size}; debug=${remoteInitial.debug} / ${remoteAfterPush.debug}"
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg

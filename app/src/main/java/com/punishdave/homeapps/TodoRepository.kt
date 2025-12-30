@@ -15,6 +15,7 @@ class TodoRepository(
 ) {
 
     data class PushResult(val created: List<TodoItem>, val failed: List<TodoItem>)
+    data class FetchResult(val items: List<TodoItem>, val debug: String)
 
     fun tasksFlow() = store.tasksFlow
     fun accessKeyFlow() = store.accessKeyFlow
@@ -31,8 +32,8 @@ class TodoRepository(
     suspend fun saveCategoryOptions(categories: List<String>) = withContext(Dispatchers.IO) { store.saveCategoryOptions(categories) }
     suspend fun saveHabitOptions(habits: List<String>) = withContext(Dispatchers.IO) { store.saveHabitOptions(habits) }
 
-    suspend fun fetchFromApi(key: String): List<TodoItem> {
-        if (key.isBlank()) return emptyList()
+    suspend fun fetchFromApi(key: String): FetchResult {
+        if (key.isBlank()) return FetchResult(emptyList(), "no key")
         return withContext(Dispatchers.IO) {
             val url = Network.TODO_BASE.toHttpUrl().newBuilder()
                 .addPathSegment("items")
@@ -47,13 +48,16 @@ class TodoRepository(
                 .build()
 
             Network.client.newCall(request).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext emptyList()
                 val body = resp.body?.string().orEmpty()
+                val debug = "url=${url}; status=${resp.code}; len=${body.length}; body=${body.take(200)}"
+                if (!resp.isSuccessful) {
+                    return@withContext FetchResult(emptyList(), debug)
+                }
                 val adapter = Network.moshi.adapter<List<TodoRemoteItem>>(
                     Types.newParameterizedType(List::class.java, TodoRemoteItem::class.java)
                 )
                 val parsed = runCatching { adapter.fromJson(body) }.getOrNull().orEmpty()
-                parsed.map { it.toLocal() }
+                FetchResult(parsed.map { it.toLocal() }, debug)
             }
         }
     }
