@@ -82,6 +82,11 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             }
             lastSyncStatus.value = "Synced ${fetched.size} days from server."
             lastError.value = null
+        } catch (e: retrofit2.HttpException) {
+            val code = e.code()
+            val msg = e.response()?.errorBody()?.string()?.take(300)
+            lastError.value = "Sync failed (HTTP $code). ${msg ?: e.message()}"
+            lastSyncStatus.value = null
         } catch (e: Exception) {
             lastError.value = "Sync failed: ${e.message ?: "unknown error"}"
             lastSyncStatus.value = null
