@@ -28,14 +28,13 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiPeople
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -427,7 +426,6 @@ private fun SettingsSection(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DropdownOrTextField(
     label: String,
@@ -459,24 +457,36 @@ private fun DropdownOrTextField(
         }
     }
 
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = it }
-    ) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .clickable(
+                    onClick = { expanded = !expanded },
+                    indication = LocalIndication.current,
+                    interactionSource = remember { MutableInteractionSource() }
+                ),
             value = value,
             onValueChange = {},
             readOnly = true,
+            enabled = options.isNotEmpty(),
             singleLine = true,
             label = { Text(label) },
             leadingIcon = leadingIcon,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+            trailingIcon = {
+                IconButton(
+                    onClick = { expanded = !expanded },
+                    enabled = options.isNotEmpty(),
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)
+                ) {
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = Color(0xFFBDBDBD))
+                }
+            }
         )
-        ExposedDropdownMenu(
+        DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth()
         ) {
             normalized.forEach { option ->
                 DropdownMenuItem(
