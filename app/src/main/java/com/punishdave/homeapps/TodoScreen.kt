@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiPeople
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Checkbox
@@ -82,6 +83,7 @@ fun TodoScreen(
     val categoryOptions by vm.categoryOptions.collectAsState()
     val habitOptions by vm.habitOptions.collectAsState()
     val dueDate by vm.dueDateText.collectAsState()
+    val isSyncing by vm.isSyncing.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
     var currentTab by rememberSaveable { mutableStateOf(TodoTab.Tasks) }
@@ -156,6 +158,7 @@ fun TodoScreen(
                     habit = habit,
                     categoryOptions = categoryOptions,
                     habitOptions = habitOptions,
+                    isSyncing = isSyncing,
                     lastErr = lastErr,
                     lastSync = lastSync,
                     onAccessKeyChange = { vm.saveAccessKey(it) },
@@ -332,6 +335,7 @@ private fun SettingsSection(
     habit: String,
     categoryOptions: List<String>,
     habitOptions: List<String>,
+    isSyncing: Boolean,
     lastErr: String?,
     lastSync: String?,
     onAccessKeyChange: (String) -> Unit,
@@ -404,12 +408,21 @@ private fun SettingsSection(
             ) {
                 FilledIconButton(
                     onClick = onSync,
+                    enabled = !isSyncing,
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = TodoAccent,
                         contentColor = Color.White
                     )
                 ) {
-                    Icon(Icons.Filled.Sync, contentDescription = "Sync")
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Filled.Sync, contentDescription = "Sync")
+                    }
                 }
             }
 
