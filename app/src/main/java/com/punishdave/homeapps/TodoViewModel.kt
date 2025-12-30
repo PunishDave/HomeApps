@@ -121,28 +121,16 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             val pushed = repo.pushItems(newLocal, key, cat, hab)
             val remoteAfterPush = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else emptyList()
 
-            // Decide final remote: prefer post-push fetch; if empty, fall back to initial.
-            val remoteLatest = if (remoteAfterPush.isNotEmpty()) remoteAfterPush else remoteInitial
+            // Decide final remote: prefer post-push fetch; if empty, fall back to initial + created.
+            val remoteLatest = when {
+                remoteAfterPush.isNotEmpty() -> remoteAfterPush
+                pushed.created.isNotEmpty() -> remoteInitial + pushed.created
+                else -> remoteInitial
+            }
 
             val (cats, habits) = repo.fetchMeta(key)
             repo.clearTasks()
-            val failedExtras = pushed.failed.filter { it.id.isBlank() || it.id.any { ch -> !ch.isDigit() } }
-
-            // Preserve completion/due where ids match.
-            val localMap = localBefore.associateBy { it.id }
-            val mergedRemote = remoteLatest.map { remoteItem ->
-                val localItem = localMap[remoteItem.id]
-                if (localItem != null) {
-                    remoteItem.copy(
-                        done = localItem.done,
-                        dueDate = remoteItem.dueDate ?: localItem.dueDate
-                    )
-                } else {
-                    remoteItem
-                }
-            }
-
-            repo.saveTasks(mergedRemote + failedExtras)
+            repo.saveTasks(remoteLatest)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
