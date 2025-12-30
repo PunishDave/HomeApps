@@ -163,7 +163,14 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteTask(id: String) = viewModelScope.launch {
+        val key = accessKey.value.trim()
         val updated = tasks.value.filterNot { it.id == id }
+
+        if (key.isNotEmpty() && id.any { it.isDigit() }) {
+            runCatching { repo.deleteRemote(id, key) }
+                .onFailure { e -> lastError.value = httpMessage(e, "Delete failed") }
+        }
+
         repo.saveTasks(updated)
     }
 

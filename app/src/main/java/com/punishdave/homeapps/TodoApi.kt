@@ -2,6 +2,7 @@ package com.punishdave.homeapps
 
 import com.squareup.moshi.JsonClass
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -48,6 +49,13 @@ interface TodoApi {
         @Query("pd_todo_key") keyQuery: String? = key,
         @Body body: Map<String, String>
     ): TodoRemoteItem
+
+    @DELETE("items/{id}")
+    suspend fun deleteItem(
+        @Path("id") id: Int,
+        @Header("X-PD-Todo-Key") key: String?,
+        @Query("pd_todo_key") keyQuery: String? = key
+    )
 }
 
 @JsonClass(generateAdapter = true)

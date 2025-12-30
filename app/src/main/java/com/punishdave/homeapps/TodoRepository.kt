@@ -96,6 +96,18 @@ class TodoRepository(
         return remote.toLocal()
     }
 
+    suspend fun deleteRemote(id: String, key: String): Boolean {
+        val intId = id.toIntOrNull() ?: return false
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                api.deleteItem(
+                    id = intId,
+                    key = key
+                )
+            }
+        }.isSuccess
+    }
+
     suspend fun createRemote(title: String, key: String, category: String, habit: String, dueDate: String): TodoItem? {
         if (title.isBlank()) return null
         return withContext(Dispatchers.IO) {
