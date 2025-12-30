@@ -112,7 +112,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         lastSyncStatus.value = "Syncing..."
         try {
             val localBefore = tasks.value
-            val pushed = repo.pushUnsynced(localBefore, key, cat, hab)
+            val pushedResult = repo.pushUnsynced(localBefore, key, cat, hab)
             val remote = repo.fetchFromApi(key)
             val (cats, habits) = repo.fetchMeta(key)
             val merged = mergeRemoteWithLocal(remote, localBefore)
@@ -124,7 +124,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            lastSyncStatus.value = "Synced ${remote.size} items; pushed ${pushed.size}; categories ${cats.size}; habits ${habits.size}."
+            val failedPushMsg = if (pushedResult.failed > 0) " (failed to push ${pushedResult.failed})" else ""
+            lastSyncStatus.value = "Synced ${remote.size} items; pushed ${pushedResult.created.size}$failedPushMsg; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg

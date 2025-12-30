@@ -1,12 +1,15 @@
 package com.punishdave.homeapps
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
 
 class TodoRepository(
     private val store: ToDoStore,
     private val api: TodoApi = Network.todoApi
 ) {
+    data class PushResult(val created: List<TodoItem>, val failed: Int)
+
     fun tasksFlow() = store.tasksFlow
     fun accessKeyFlow() = store.accessKeyFlow
     fun categoryFlow() = store.categoryFlow
@@ -52,9 +55,15 @@ class TodoRepository(
         }
     }
 
-    suspend fun pushUnsynced(local: List<TodoItem>, key: String, category: String, habit: String): List<TodoItem> {
-        if (key.isBlank()) return emptyList()
+    suspend fun pushUnsynced(local: List<TodoItem>, key: String, category: String, habit: String): PushResult {
+        if (key.isBlank()) return PushResult(emptyList(), 0)
         val created = mutableListOf<TodoItem>()
+        var failed = 0
+
+        val categoryOptions = store.categoryOptionsFlow.firstOrNull().orEmpty()
+        val habitOptions = store.habitOptionsFlow.firstOrNull().orEmpty()
+        val effectiveCategory = if (category.isNotBlank()) category else categoryOptions.firstOrNull().orEmpty()
+        val effectiveHabit = if (habit.isNotBlank()) habit else habitOptions.firstOrNull().orEmpty()
         for (item in local) {
             val needsPush = item.id.isBlank() || item.id.any { ch -> !ch.isDigit() }
             if (!needsPush) continue
@@ -63,24 +72,27 @@ class TodoRepository(
                 createRemote(
                     title = item.title,
                     key = key,
-                    category = category,
-                    habit = habit,
+                    category = effectiveCategory,
+                    habit = effectiveHabit,
                     dueDate = item.dueDate.orEmpty()
                 )
             }.getOrNull()
 
-            if (remote != null) {
-                var finalItem = remote
-                if (item.done && !remote.done) {
-                    val updated = runCatching { updateStatusRemote(remote.id, true, key) }.getOrNull()
-                    if (updated != null) {
-                        finalItem = updated
-                    }
-                }
-                created += finalItem
+            if (remote == null) {
+                failed += 1
+                continue
             }
+
+            var finalItem = remote
+            if (item.done && !remote.done) {
+                val updated = runCatching { updateStatusRemote(remote.id, true, key) }.getOrNull()
+                if (updated != null) {
+                    finalItem = updated
+                }
+            }
+            created += finalItem
         }
-        return created
+        return PushResult(created, failed)
     }
 
     suspend fun updateStatusRemote(id: String, done: Boolean, key: String): TodoItem? {
