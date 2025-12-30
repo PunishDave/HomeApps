@@ -123,7 +123,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
             val (cats, habits) = repo.fetchMeta(key)
             repo.clearTasks()
-            repo.saveTasks(mergeRemoteWithLocal(remoteLatest, localBefore, pushed.failed))
+            val failedExtras = pushed.failed.filter { it.id.isBlank() || it.id.any { ch -> !ch.isDigit() } }
+            repo.saveTasks(remoteLatest + failedExtras)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
