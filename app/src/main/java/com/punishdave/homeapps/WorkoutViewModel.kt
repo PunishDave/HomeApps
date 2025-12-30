@@ -63,6 +63,28 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveAccessKey(key.trim())
     }
 
+    fun addEntryForMove(moveName: String, notes: String) = viewModelScope.launch {
+        val w = moveName.trim()
+        val n = notes.trim()
+        if (w.isEmpty()) {
+            lastError.value = "Workout name missing."
+            return@launch
+        }
+        if (n.isEmpty()) {
+            lastError.value = "Add weight/reps first."
+            return@launch
+        }
+
+        val newEntry = WorkoutEntry(
+            date = LocalDate.now().toString(),
+            workout = w,
+            notes = n
+        )
+        val updated = listOf(newEntry) + entries.value
+        repo.save(updated)
+        lastError.value = null
+    }
+
     fun selectDay(key: String) {
         selectedDayKey.value = key
     }

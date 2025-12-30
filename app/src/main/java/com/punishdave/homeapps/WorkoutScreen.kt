@@ -159,69 +159,12 @@ private fun WorkoutLogSection(
     days: List<WorkoutDay>,
     selectedDayKey: String?
 ) {
-    val lastByWorkout = remember(entries) { lastLogByWorkout(entries) }
     val selectedDay = days.firstOrNull { it.day_key == selectedDayKey }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = WorkoutPanel,
-                border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.4f)),
-                tonalElevation = 2.dp
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = dateText,
-                        onValueChange = { vm.dateText.value = it },
-                        singleLine = true,
-                        label = { Text("Date (YYYY-MM-DD)") }
-                    )
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = workoutText,
-                        onValueChange = { vm.workoutText.value = it },
-                        singleLine = true,
-                        label = { Text("Workout / Day") },
-                        leadingIcon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null) }
-                    )
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = notesText,
-                        onValueChange = { vm.notesText.value = it },
-                        singleLine = false,
-                        maxLines = 3,
-                        label = { Text("Notes (weight, reps, etc.)") }
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        FilledIconButton(
-                            onClick = { vm.addEntry() },
-                            colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                                containerColor = WorkoutAccent,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Icon(Icons.Filled.Add, contentDescription = "Add entry")
-                        }
-                    }
-                }
-            }
-        }
-
         if (lastErr != null) {
             item {
                 Text(
@@ -280,27 +223,15 @@ private fun WorkoutLogSection(
                 )
             }
         } else {
-            items(selectedDay.workouts) { move ->
-                val last = lastByWorkout[move.name.trim().lowercase()]
-                WorkoutWorkoutRow(move = move, last = last)
-            }
-        }
-
-        if (entries.isNotEmpty()) {
-            item {
-                Text(
-                    text = "All entries (latest first)",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            items(entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })) { entry ->
-                WorkoutRow(
-                    entry = entry,
-                    last = lastByWorkout[entry.workout.trim().lowercase()],
-                    onDelete = { vm.deleteEntry(entry.id) }
+            items(selectedDay.workouts, key = { it.name }) { move ->
+                val history = remember(entries, move.name) {
+                    entries.filter { it.workout.equals(move.name, ignoreCase = true) }
+                        .sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })
+                }
+                WorkoutMoveCard(
+                    move = move,
+                    history = history,
+                    onAdd = { note -> vm.addEntryForMove(move.name, note) }
                 )
             }
         }
@@ -308,7 +239,13 @@ private fun WorkoutLogSection(
 }
 
 @Composable
-private fun WorkoutWorkoutRow(move: WorkoutMove, last: WorkoutEntry?) {
+private fun WorkoutMoveCard(
+    move: WorkoutMove,
+    history: List<WorkoutEntry>,
+    onAdd: (String) -> Unit
+) {
+    var noteText by rememberSaveable(move.name) { mutableStateOf("") }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
@@ -334,21 +271,66 @@ private fun WorkoutWorkoutRow(move: WorkoutMove, last: WorkoutEntry?) {
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            if (last != null) {
-                val lastLabel = "Last logged ${formatDate(last.date)}"
-                val lastNotes = last.notes.takeIf { it.isNotBlank() }
-                Text(
-                    text = listOfNotNull(lastLabel, lastNotes).joinToString(" – "),
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium
-                )
+
+            Text(
+                text = "History",
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (history.isNotEmpty()) {
+                history.take(4).forEach { entry ->
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = formatDate(entry.date),
+                            color = Color(0xFFBDBDBD),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        entry.notes.takeIf { it.isNotBlank() }?.let {
+                            Text(
+                                text = it,
+                                color = Color(0xFFDFDFDF),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
             } else {
                 Text(
-                    text = "No history yet. Add an entry with this name to start tracking.",
+                    text = "No history yet. Add an entry below to start tracking.",
                     color = Color(0xFF9E9E9E),
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = noteText,
+                onValueChange = { noteText = it },
+                singleLine = true,
+                label = { Text("New weight / reps / notes") }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                FilledIconButton(
+                    onClick = {
+                        val trimmed = noteText.trim()
+                        if (trimmed.isNotEmpty()) {
+                            onAdd(trimmed)
+                            noteText = ""
+                        }
+                    },
+                    colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                        containerColor = WorkoutAccent,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add entry")
+                }
             }
         }
     }
