@@ -112,8 +112,19 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         lastSyncStatus.value = "Syncing..."
         try {
             val localBefore = tasks.value
-            val pushedResult = repo.pushUnsynced(localBefore, key, cat, hab)
-            val remote = repo.fetchFromApi(key)
+            val initialRemote = repo.fetchFromApi(key)
+
+            // Decide what to push: anything without a numeric id or not present remotely by id/title.
+            val toPush = localBefore.filter { item ->
+                val isNumericId = item.id.all { it.isDigit() } && item.id.isNotBlank()
+                val existsRemote = initialRemote.any {
+                    it.id == item.id || it.title.equals(item.title, ignoreCase = true)
+                }
+                !isNumericId || !existsRemote
+            }
+
+            val pushedResult = repo.pushItems(toPush, key, cat, hab)
+            val remote = if (pushedResult.created.isNotEmpty()) repo.fetchFromApi(key) else initialRemote
             val (cats, habits) = repo.fetchMeta(key)
             val merged = mergeRemoteWithLocal(remote, localBefore, pushedResult.failed)
             repo.saveTasks(merged)

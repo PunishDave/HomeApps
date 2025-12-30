@@ -55,8 +55,8 @@ class TodoRepository(
         }
     }
 
-    suspend fun pushUnsynced(local: List<TodoItem>, key: String, category: String, habit: String): PushResult {
-        if (key.isBlank()) return PushResult(emptyList(), emptyList())
+    suspend fun pushItems(items: List<TodoItem>, key: String, category: String, habit: String): PushResult {
+        if (key.isBlank() || items.isEmpty()) return PushResult(emptyList(), emptyList())
         val created = mutableListOf<TodoItem>()
         val failed = mutableListOf<TodoItem>()
 
@@ -64,10 +64,7 @@ class TodoRepository(
         val habitOptions = store.habitOptionsFlow.firstOrNull().orEmpty()
         val effectiveCategory = if (category.isNotBlank()) category else categoryOptions.firstOrNull().orEmpty()
         val effectiveHabit = if (habit.isNotBlank()) habit else habitOptions.firstOrNull().orEmpty()
-        for (item in local) {
-            val needsPush = item.id.isBlank() || item.id.any { ch -> !ch.isDigit() }
-            if (!needsPush) continue
-
+        for (item in items) {
             val remote = runCatching {
                 createRemote(
                     title = item.title,
