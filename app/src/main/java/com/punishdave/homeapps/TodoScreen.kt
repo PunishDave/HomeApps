@@ -32,6 +32,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiPeople
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -41,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.menuAnchor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -76,6 +81,8 @@ fun TodoScreen(
     val accessKey by vm.accessKey.collectAsState()
     val category by vm.category.collectAsState()
     val habit by vm.habit.collectAsState()
+    val categoryOptions by vm.categoryOptions.collectAsState()
+    val habitOptions by vm.habitOptions.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
     var currentTab by rememberSaveable { mutableStateOf(TodoTab.Tasks) }
@@ -146,6 +153,8 @@ fun TodoScreen(
                     accessKey = accessKey,
                     category = category,
                     habit = habit,
+                    categoryOptions = categoryOptions,
+                    habitOptions = habitOptions,
                     lastErr = lastErr,
                     lastSync = lastSync,
                     onAccessKeyChange = { vm.saveAccessKey(it) },
@@ -311,6 +320,8 @@ private fun SettingsSection(
     accessKey: String,
     category: String,
     habit: String,
+    categoryOptions: List<String>,
+    habitOptions: List<String>,
     lastErr: String?,
     lastSync: String?,
     onAccessKeyChange: (String) -> Unit,
@@ -356,27 +367,25 @@ private fun SettingsSection(
                 singleLine = true,
                 label = { Text("Access key") }
             )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
+            DropdownOrTextField(
+                label = "Category (optional)",
                 value = categoryInput,
+                options = categoryOptions,
+                leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null) },
                 onValueChange = {
                     categoryInput = it
                     onCategoryChange(it)
-                },
-                singleLine = true,
-                label = { Text("Category (optional)") },
-                leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null) }
+                }
             )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
+            DropdownOrTextField(
+                label = "Habit (optional)",
                 value = habitInput,
+                options = habitOptions,
+                leadingIcon = { Icon(Icons.Filled.EmojiPeople, contentDescription = null) },
                 onValueChange = {
                     habitInput = it
                     onHabitChange(it)
-                },
-                singleLine = true,
-                label = { Text("Habit (optional)") },
-                leadingIcon = { Icon(Icons.Filled.EmojiPeople, contentDescription = null) }
+                }
             )
 
             Row(
@@ -413,6 +422,71 @@ private fun SettingsSection(
                     text = "Not synced yet. Enter the access key and press Sync.",
                     color = Color(0xFFBDBDBD),
                     style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DropdownOrTextField(
+    label: String,
+    value: String,
+    options: List<String>,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    onValueChange: (String) -> Unit
+) {
+    if (options.isEmpty()) {
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            label = { Text(label) },
+            leadingIcon = leadingIcon
+        )
+        return
+    }
+
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val normalized = remember(options, value) {
+        buildList {
+            add("")
+            if (value.isNotBlank()) add(value)
+            options.forEach { opt ->
+                if (opt.isNotBlank() && !contains(opt)) add(opt)
+            }
+        }
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text(label) },
+            leadingIcon = leadingIcon,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            normalized.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(if (option.isBlank()) "None" else option) },
+                    onClick = {
+                        expanded = false
+                        onValueChange(option)
+                    }
                 )
             }
         }

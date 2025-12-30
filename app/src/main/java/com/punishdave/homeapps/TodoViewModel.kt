@@ -23,6 +23,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val category = repo.categoryFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val habit = repo.habitFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val categoryOptions = repo.categoryOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val habitOptions = repo.habitOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val newTaskText = MutableStateFlow("")
     val lastError = MutableStateFlow<String?>(null)
     val lastSyncStatus = MutableStateFlow<String?>(null)
@@ -80,10 +82,18 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         }
         try {
             val remote = repo.fetchFromApi(key)
+            val (cats, habits) = repo.fetchMeta(key)
             val local = tasks.value
             val merged = mergeRemoteWithLocal(remote, local)
             repo.saveTasks(merged)
-            lastSyncStatus.value = "Synced ${remote.size} items from server; showing ${merged.size}."
+            if (cats.isNotEmpty() && category.value.isBlank()) {
+                repo.saveCategory(cats.first())
+            }
+            if (habits.isNotEmpty() && habit.value.isBlank()) {
+                repo.saveHabit(habits.first())
+            }
+            lastError.value = null
+            lastSyncStatus.value = "Synced ${remote.size} items; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg

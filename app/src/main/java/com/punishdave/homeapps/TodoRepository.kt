@@ -11,11 +11,15 @@ class TodoRepository(
     fun accessKeyFlow() = store.accessKeyFlow
     fun categoryFlow() = store.categoryFlow
     fun habitFlow() = store.habitFlow
+    fun categoryOptionsFlow() = store.categoryOptionsFlow
+    fun habitOptionsFlow() = store.habitOptionsFlow
 
     suspend fun saveTasks(tasks: List<TodoItem>) = withContext(Dispatchers.IO) { store.saveTasks(tasks) }
     suspend fun saveAccessKey(key: String) = withContext(Dispatchers.IO) { store.saveAccessKey(key) }
     suspend fun saveCategory(cat: String) = withContext(Dispatchers.IO) { store.saveCategory(cat) }
     suspend fun saveHabit(habit: String) = withContext(Dispatchers.IO) { store.saveHabit(habit) }
+    suspend fun saveCategoryOptions(categories: List<String>) = withContext(Dispatchers.IO) { store.saveCategoryOptions(categories) }
+    suspend fun saveHabitOptions(habits: List<String>) = withContext(Dispatchers.IO) { store.saveHabitOptions(habits) }
 
     suspend fun fetchFromApi(key: String): List<TodoItem> {
         if (key.isBlank()) return emptyList()
@@ -34,6 +38,17 @@ class TodoRepository(
                 page += 1
             }
             all.map { it.toLocal() }
+        }
+    }
+
+    suspend fun fetchMeta(key: String): Pair<List<String>, List<String>> {
+        if (key.isBlank()) return emptyList<String>() to emptyList()
+        return withContext(Dispatchers.IO) {
+            val categories = runCatching { api.listCategories(key = key) }.getOrElse { emptyList() }
+            val habits = runCatching { api.listHabits(key = key) }.getOrElse { emptyList() }
+            store.saveCategoryOptions(categories)
+            store.saveHabitOptions(habits)
+            categories to habits
         }
     }
 

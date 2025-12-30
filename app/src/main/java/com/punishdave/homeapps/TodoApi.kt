@@ -9,6 +9,18 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface TodoApi {
+    @GET("categories")
+    suspend fun listCategories(
+        @Header("X-PD-Todo-Key") key: String?,
+        @Query("pd_todo_key") keyQuery: String? = key
+    ): List<String>
+
+    @GET("habits")
+    suspend fun listHabits(
+        @Header("X-PD-Todo-Key") key: String?,
+        @Query("pd_todo_key") keyQuery: String? = key
+    ): List<String>
+
     @GET("items")
     suspend fun listItems(
         @Header("X-PD-Todo-Key") key: String?,

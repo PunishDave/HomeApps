@@ -17,12 +17,16 @@ class ToDoStore(private val context: Context) {
     private val KEY_ACCESS = stringPreferencesKey("todo_access_key")
     private val KEY_CATEGORY = stringPreferencesKey("todo_category")
     private val KEY_HABIT = stringPreferencesKey("todo_habit")
+    private val KEY_CATEGORY_OPTIONS = stringPreferencesKey("todo_category_options")
+    private val KEY_HABIT_OPTIONS = stringPreferencesKey("todo_habit_options")
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
     private val listType = Types.newParameterizedType(List::class.java, TodoItem::class.java)
     private val adapter = moshi.adapter<List<TodoItem>>(listType)
+    private val stringListType = Types.newParameterizedType(List::class.java, String::class.java)
+    private val stringListAdapter = moshi.adapter<List<String>>(stringListType)
 
     val tasksFlow: Flow<List<TodoItem>> = context.todoDataStore.data.map { prefs ->
         val raw = prefs[KEY_TASKS]
@@ -42,6 +46,18 @@ class ToDoStore(private val context: Context) {
         prefs[KEY_HABIT] ?: ""
     }
 
+    val categoryOptionsFlow: Flow<List<String>> = context.todoDataStore.data.map { prefs ->
+        val raw = prefs[KEY_CATEGORY_OPTIONS]
+        if (raw.isNullOrEmpty()) return@map emptyList()
+        runCatching { stringListAdapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
+    }
+
+    val habitOptionsFlow: Flow<List<String>> = context.todoDataStore.data.map { prefs ->
+        val raw = prefs[KEY_HABIT_OPTIONS]
+        if (raw.isNullOrEmpty()) return@map emptyList()
+        runCatching { stringListAdapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
+    }
+
     suspend fun saveTasks(tasks: List<TodoItem>) {
         context.todoDataStore.edit { it[KEY_TASKS] = adapter.toJson(tasks) }
     }
@@ -56,5 +72,13 @@ class ToDoStore(private val context: Context) {
 
     suspend fun saveHabit(habit: String) {
         context.todoDataStore.edit { it[KEY_HABIT] = habit }
+    }
+
+    suspend fun saveCategoryOptions(categories: List<String>) {
+        context.todoDataStore.edit { it[KEY_CATEGORY_OPTIONS] = stringListAdapter.toJson(categories) }
+    }
+
+    suspend fun saveHabitOptions(habits: List<String>) {
+        context.todoDataStore.edit { it[KEY_HABIT_OPTIONS] = stringListAdapter.toJson(habits) }
     }
 }
