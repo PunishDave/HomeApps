@@ -565,7 +565,7 @@ private fun TodoRow(
                     task.dueDate?.takeIf { it.isNotBlank() }?.let { due ->
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = due,
+                            text = shortDate(due),
                             color = Color(0xFFBDBDBD),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Medium
@@ -586,4 +586,11 @@ private fun TodoRow(
             }
         }
     }
+}
+
+private fun shortDate(raw: String): String {
+    val trimmed = raw.trim()
+    val tSplit = trimmed.substringBefore('T', trimmed)
+    val spaceSplit = tSplit.substringBefore(' ', tSplit)
+    return spaceSplit.ifBlank { trimmed }
 }
