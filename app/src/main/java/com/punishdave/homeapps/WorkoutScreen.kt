@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -157,7 +158,7 @@ private fun WorkoutLogSection(
     }
 
     // When entries change, keep selection to a valid date
-    LaunchedEffect(availableDates) {
+    LaunchedEffect(visibleDates) {
         if (visibleDates.isNotEmpty() && selectedDate !in visibleDates) {
             selectedDate = visibleDates.first()
         }
@@ -168,6 +169,11 @@ private fun WorkoutLogSection(
     }
     val lastByWorkout = remember(entries) { lastLogByWorkout(entries) }
 
+    LazyColumn(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -221,103 +227,91 @@ private fun WorkoutLogSection(
                     }
                 }
             }
+        }
 
-            if (lastErr != null) {
-                Spacer(modifier = Modifier.height(6.dp))
+        if (lastErr != null) {
+            item {
                 Text(
-                    text = lastErr ?: "",
+                    text = lastErr,
                     color = Color(0xFFFFB3B3),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Day selector
+        item {
             Text(
                 text = "Available days",
                 color = Color.White,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    androidx.compose.foundation.lazy.LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        }
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(visibleDates.size) { idx ->
+                    val dateStr = visibleDates[idx]
+                    val isSelected = dateStr == selectedDate
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) WorkoutAccent else WorkoutPanel,
+                        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.5f)),
+                        onClick = { selectedDate = dateStr }
                     ) {
-                        items(visibleDates.size) { idx ->
-                            val dateStr = visibleDates[idx]
-                            val isSelected = dateStr == selectedDate
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isSelected) WorkoutAccent else WorkoutPanel,
-                                border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.5f)),
-                                onClick = { selectedDate = dateStr }
-                            ) {
-                                Text(
-                                    text = formatDate(dateStr),
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    color = Color.White,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Selected day details
-                item {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Workouts on ${formatDate(selectedDate)}",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                if (dayEntries.isEmpty()) {
-                    item {
                         Text(
-                            text = "No entries for this day yet. Add one above to start tracking.",
-                            color = Color(0xFFB0B0B0),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
-                } else {
-                    items(dayEntries) { entry ->
-                        WorkoutRow(
-                            entry = entry,
-                            last = lastByWorkout[entry.workout.trim().lowercase()],
-                            onDelete = { vm.deleteEntry(entry.id) }
-                        )
-                    }
-                }
-
-                if (entries.isNotEmpty()) {
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "All entries (latest first)",
+                            text = formatDate(dateStr),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             color = Color.White,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    items(entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })) { entry ->
-                        WorkoutRow(
-                            entry = entry,
-                            last = lastByWorkout[entry.workout.trim().lowercase()],
-                            onDelete = { vm.deleteEntry(entry.id) }
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }
+            }
+        }
+
+        item {
+            Text(
+                text = "Workouts on ${formatDate(selectedDate)}",
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        if (dayEntries.isEmpty()) {
+            item {
+                Text(
+                    text = "No entries for this day yet. Add one above to start tracking.",
+                    color = Color(0xFFB0B0B0),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        } else {
+            items(dayEntries) { entry ->
+                WorkoutRow(
+                    entry = entry,
+                    last = lastByWorkout[entry.workout.trim().lowercase()],
+                    onDelete = { vm.deleteEntry(entry.id) }
+                )
+            }
+        }
+
+        if (entries.isNotEmpty()) {
+            item {
+                Text(
+                    text = "All entries (latest first)",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            items(entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })) { entry ->
+                WorkoutRow(
+                    entry = entry,
+                    last = lastByWorkout[entry.workout.trim().lowercase()],
+                    onDelete = { vm.deleteEntry(entry.id) }
+                )
             }
         }
     }
@@ -330,7 +324,7 @@ private fun WorkoutSettingsSection(
     lastSync: String?,
     onAccessKeyChange: (String) -> Unit,
     onSync: () -> Unit
- ) {
+) {
     var accessKeyInput by rememberSaveable { mutableStateOf(accessKey) }
 
     LaunchedEffect(accessKey) { accessKeyInput = accessKey }
