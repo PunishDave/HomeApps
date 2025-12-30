@@ -463,10 +463,7 @@ private fun PlanWeekDayCard(
                 ) {
                     TextField(
                         modifier = Modifier
-                            .menuAnchor(
-                                type = MenuAnchorType.PrimaryNotEditable,
-                                enabled = true
-                            )
+                            .menuAnchor()
                             .fillMaxWidth(),
                         value = selectedTitle,
                         onValueChange = {},
