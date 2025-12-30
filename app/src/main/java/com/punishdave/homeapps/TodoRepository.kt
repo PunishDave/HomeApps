@@ -39,12 +39,15 @@ class TodoRepository(
                 .addPathSegment("items")
                 .addQueryParameter("per_page", "100")
                 .addQueryParameter("pd_todo_key", key)
+                .addQueryParameter("_ts", System.currentTimeMillis().toString())
                 .build()
 
             val request = Request.Builder()
                 .url(url)
                 .get()
                 .addHeader("X-PD-Todo-Key", key)
+                .addHeader("Cache-Control", "no-cache")
+                .addHeader("Pragma", "no-cache")
                 .build()
 
             Network.client.newCall(request).execute().use { resp ->
