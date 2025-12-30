@@ -1,3 +1,5 @@
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
+
 package com.punishdave.homeapps
 
 import androidx.compose.foundation.BorderStroke
@@ -98,12 +100,14 @@ fun WorkoutScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 WorkoutTabCard(
+                    modifier = Modifier.weight(1f),
                     title = "Log",
                     subtitle = "Add & view sessions",
                     selected = currentTab == WorkoutTab.Log,
                     onClick = { currentTab = WorkoutTab.Log }
                 )
                 WorkoutTabCard(
+                    modifier = Modifier.weight(1f),
                     title = "Settings",
                     subtitle = "Access key & sync",
                     selected = currentTab == WorkoutTab.Settings,
@@ -485,6 +489,7 @@ private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEn
 
 @Composable
 private fun WorkoutTabCard(
+    modifier: Modifier = Modifier,
     title: String,
     subtitle: String,
     selected: Boolean,
@@ -493,9 +498,7 @@ private fun WorkoutTabCard(
     val borderColor = if (selected) WorkoutAccent else WorkoutAccent.copy(alpha = 0.4f)
     val bg = if (selected) WorkoutPanel else Color(0xFF121212)
     Surface(
-        modifier = Modifier
-            .weight(1f)
-            .heightIn(min = 80.dp),
+        modifier = modifier.heightIn(min = 80.dp),
         shape = RoundedCornerShape(12.dp),
         color = bg,
         tonalElevation = 2.dp,
