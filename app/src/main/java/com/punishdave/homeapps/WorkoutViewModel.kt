@@ -21,11 +21,13 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = WorkoutRepository(WorkoutStore(app.applicationContext))
 
     val entries = repo.entriesFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     val workoutText = MutableStateFlow("")
     val notesText = MutableStateFlow("")
     val dateText = MutableStateFlow(LocalDate.now().toString())
     val lastError = MutableStateFlow<String?>(null)
+    val lastSyncStatus = MutableStateFlow<String?>(null)
 
     fun addEntry() = viewModelScope.launch {
         val w = workoutText.value.trim()
@@ -53,5 +55,20 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteEntry(id: String) = viewModelScope.launch {
         val updated = entries.value.filterNot { it.id == id }
         repo.save(updated)
+    }
+
+    fun saveAccessKey(key: String) = viewModelScope.launch {
+        repo.saveAccessKey(key.trim())
+    }
+
+    fun syncFromApi() = viewModelScope.launch {
+        val key = accessKey.value.trim()
+        if (key.isEmpty()) {
+            lastError.value = "Enter the access key first."
+            lastSyncStatus.value = "Sync skipped: no access key."
+            return@launch
+        }
+        // Placeholder until a real API is wired
+        lastSyncStatus.value = "No workout sync API configured yet. Stored key."
     }
 }

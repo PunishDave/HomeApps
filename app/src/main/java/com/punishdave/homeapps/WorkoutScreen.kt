@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +51,8 @@ private val WorkoutPanel = Color(0xFF0F0F0F)
 private val WorkoutAccent = Color(0xFFB00020)
 private val DateDisplayFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM")
 
+private enum class WorkoutTab { Log, Settings }
+
 @Composable
 fun WorkoutScreen(
     onBack: () -> Unit
@@ -59,32 +63,9 @@ fun WorkoutScreen(
     val notesText by vm.notesText.collectAsState()
     val dateText by vm.dateText.collectAsState()
     val lastErr by vm.lastError.collectAsState()
-    val availableDates = remember(entries) {
-        entries.mapNotNull { it.date.takeIf { it.isNotBlank() } }
-            .distinct()
-            .sortedWith(compareByDescending<String> { parseDate(it) ?: LocalDate.MIN })
-    }
-    val visibleDates = if (availableDates.isEmpty()) {
-        listOf(dateText.ifBlank { LocalDate.now().toString() })
-    } else {
-        availableDates
-    }
-    var selectedDate by rememberSaveable(visibleDates) {
-        mutableStateOf(visibleDates.first())
-    }
-
-    // When entries change, keep selection to a valid date
-    LaunchedEffect(availableDates) {
-        if (visibleDates.isNotEmpty() && selectedDate !in visibleDates) {
-            selectedDate = visibleDates.first()
-        }
-    }
-
-    val dayEntries = remember(selectedDate, entries) {
-        entries.filter { it.date == selectedDate }
-    }
-    val lastByWorkout = remember(entries) { lastLogByWorkout(entries) }
-
+    val accessKey by vm.accessKey.collectAsState()
+    val lastSync by vm.lastSyncStatus.collectAsState()
+    var currentTab by rememberSaveable { mutableStateOf(WorkoutTab.Log) }
     Surface(modifier = Modifier.fillMaxSize(), color = WorkoutBg) {
         Column(
             modifier = Modifier
@@ -110,6 +91,82 @@ fun WorkoutScreen(
             }
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                WorkoutTabCard(
+                    title = "Log",
+                    subtitle = "Add & view sessions",
+                    selected = currentTab == WorkoutTab.Log,
+                    onClick = { currentTab = WorkoutTab.Log }
+                )
+                WorkoutTabCard(
+                    title = "Settings",
+                    subtitle = "Access key & sync",
+                    selected = currentTab == WorkoutTab.Settings,
+                    onClick = { currentTab = WorkoutTab.Settings }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            when (currentTab) {
+                WorkoutTab.Log -> WorkoutLogSection(
+                    vm = vm,
+                    entries = entries,
+                    workoutText = workoutText,
+                    notesText = notesText,
+                    dateText = dateText,
+                    lastErr = lastErr
+                )
+                WorkoutTab.Settings -> WorkoutSettingsSection(
+                    accessKey = accessKey,
+                    lastErr = lastErr,
+                    lastSync = lastSync,
+                    onAccessKeyChange = { vm.saveAccessKey(it) },
+                    onSync = { vm.syncFromApi() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkoutLogSection(
+    vm: WorkoutViewModel,
+    entries: List<WorkoutEntry>,
+    workoutText: String,
+    notesText: String,
+    dateText: String,
+    lastErr: String?
+) {
+    val availableDates = remember(entries) {
+        entries.mapNotNull { it.date.takeIf { it.isNotBlank() } }
+            .distinct()
+            .sortedWith(compareByDescending<String> { parseDate(it) ?: LocalDate.MIN })
+    }
+    val visibleDates = if (availableDates.isEmpty()) {
+        listOf(dateText.ifBlank { LocalDate.now().toString() })
+    } else {
+        availableDates
+    }
+    var selectedDate by rememberSaveable(visibleDates) {
+        mutableStateOf(visibleDates.first())
+    }
+
+    // When entries change, keep selection to a valid date
+    LaunchedEffect(availableDates) {
+        if (visibleDates.isNotEmpty() && selectedDate !in visibleDates) {
+            selectedDate = visibleDates.first()
+        }
+    }
+
+    val dayEntries = remember(selectedDate, entries) {
+        entries.filter { it.date == selectedDate }
+    }
+    val lastByWorkout = remember(entries) { lastLogByWorkout(entries) }
 
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -267,6 +324,89 @@ fun WorkoutScreen(
 }
 
 @Composable
+private fun WorkoutSettingsSection(
+    accessKey: String,
+    lastErr: String?,
+    lastSync: String?,
+    onAccessKeyChange: (String) -> Unit,
+    onSync: () -> Unit
+ ) {
+    var accessKeyInput by rememberSaveable { mutableStateOf(accessKey) }
+
+    LaunchedEffect(accessKey) { accessKeyInput = accessKey }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(12.dp),
+        color = WorkoutPanel,
+        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.4f)),
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Sync & API",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = accessKeyInput,
+                onValueChange = {
+                    accessKeyInput = it
+                    onAccessKeyChange(it)
+                },
+                singleLine = true,
+                label = { Text("Access key") }
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                FilledIconButton(
+                    onClick = onSync,
+                    colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                        containerColor = WorkoutAccent,
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Filled.Sync, contentDescription = "Sync")
+                }
+            }
+
+            lastErr?.let {
+                Text(
+                    text = it,
+                    color = Color(0xFFFF9B9B),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            if (!lastSync.isNullOrBlank()) {
+                Text(
+                    text = lastSync,
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                Text(
+                    text = "Not synced yet. Enter the access key and press Sync.",
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun WorkoutRow(
     entry: WorkoutEntry,
     last: WorkoutEntry?,
@@ -347,4 +487,45 @@ private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEn
         }
     }
     return map
+}
+
+@Composable
+private fun WorkoutTabCard(
+    title: String,
+    subtitle: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (selected) WorkoutAccent else WorkoutAccent.copy(alpha = 0.4f)
+    val bg = if (selected) WorkoutPanel else Color(0xFF121212)
+    Surface(
+        modifier = Modifier
+            .weight(1f)
+            .heightIn(min = 80.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = bg,
+        tonalElevation = 2.dp,
+        border = BorderStroke(1.dp, borderColor),
+        onClick = onClick
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = subtitle,
+                color = Color(0xFFBDBDBD),
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2
+            )
+        }
+    }
 }

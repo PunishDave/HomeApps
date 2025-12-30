@@ -14,6 +14,7 @@ private val Context.workoutDataStore by preferencesDataStore(name = "workout_sto
 
 class WorkoutStore(private val context: Context) {
     private val KEY_ENTRIES = stringPreferencesKey("workout_entries_json")
+    private val KEY_ACCESS = stringPreferencesKey("workout_access_key")
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -27,7 +28,15 @@ class WorkoutStore(private val context: Context) {
         runCatching { adapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
     }
 
+    val accessKeyFlow: Flow<String> = context.workoutDataStore.data.map { prefs ->
+        prefs[KEY_ACCESS] ?: ""
+    }
+
     suspend fun saveEntries(entries: List<WorkoutEntry>) {
         context.workoutDataStore.edit { it[KEY_ENTRIES] = adapter.toJson(entries) }
+    }
+
+    suspend fun saveAccessKey(key: String) {
+        context.workoutDataStore.edit { it[KEY_ACCESS] = key }
     }
 }
