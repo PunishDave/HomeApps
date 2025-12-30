@@ -62,9 +62,6 @@ fun WorkoutScreen(
 ) {
     val vm: WorkoutViewModel = viewModel()
     val entries by vm.entries.collectAsState()
-    val workoutText by vm.workoutText.collectAsState()
-    val notesText by vm.notesText.collectAsState()
-    val dateText by vm.dateText.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
@@ -129,9 +126,6 @@ fun WorkoutScreen(
                 WorkoutTab.Log -> WorkoutLogSection(
                     vm = vm,
                     entries = entries,
-                    workoutText = workoutText,
-                    notesText = notesText,
-                    dateText = dateText,
                     lastErr = lastErr,
                     days = days,
                     selectedDayKey = selectedDayKey
@@ -152,9 +146,6 @@ fun WorkoutScreen(
 private fun WorkoutLogSection(
     vm: WorkoutViewModel,
     entries: List<WorkoutEntry>,
-    workoutText: String,
-    notesText: String,
-    dateText: String,
     lastErr: String?,
     days: List<WorkoutDay>,
     selectedDayKey: String?
