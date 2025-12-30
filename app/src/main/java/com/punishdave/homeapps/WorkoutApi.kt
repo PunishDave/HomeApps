@@ -9,7 +9,12 @@ interface WorkoutApi {
     @GET("days")
     suspend fun listDays(
         @Header("X-PD-SWL-Key") key: String? = null,
-        @Query("pd_swl_key") keyQuery: String? = key
+        @Header("X-PDSWL-Key") altHeader: String? = null,
+        @Header("Authorization") bearer: String? = null,
+        @Query("pd_swl_key") keyQuery: String? = key,
+        @Query("pdswl_key") altQuery: String? = key,
+        @Query("key") plainKey: String? = key,
+        @Query("access_key") accessKey: String? = key
     ): List<WorkoutDay>
 }
 

@@ -13,6 +13,15 @@ class WorkoutRepository(private val store: WorkoutStore) {
     }
 
     suspend fun fetchDays(key: String?): List<WorkoutDay> {
-        return Network.workoutApi.listDays(key = key, keyQuery = key)
+        val bearer = key?.let { "Bearer $it" }
+        return Network.workoutApi.listDays(
+            key = key,
+            altHeader = key,
+            bearer = bearer,
+            keyQuery = key,
+            altQuery = key,
+            plainKey = key,
+            accessKey = key
+        )
     }
 }
