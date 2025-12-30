@@ -1,3 +1,5 @@
+@file:Suppress("INVISIBLE_REFERENCE", "INVISIBLE_MEMBER")
+
 package com.punishdave.homeapps
 
 import androidx.compose.foundation.BorderStroke
