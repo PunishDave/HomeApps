@@ -115,7 +115,9 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             val remote = repo.fetchFromApi(key)
 
             // Push new local items that do not have numeric IDs.
-            val newLocal = localBefore.filter { it.id.isBlank() || it.any { ch -> !ch.isDigit() } }
+            val newLocal = localBefore.filter { item ->
+                item.id.isBlank() || item.id.any { ch -> !ch.isDigit() }
+            }
             val pushed = repo.pushItems(newLocal, key, cat, hab)
             val remoteLatest = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else remote
 
