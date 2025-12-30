@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -317,6 +318,14 @@ private fun SettingsSection(
     onHabitChange: (String) -> Unit,
     onSync: () -> Unit
 ) {
+    var accessKeyInput by rememberSaveable { mutableStateOf(accessKey) }
+    var categoryInput by rememberSaveable { mutableStateOf(category) }
+    var habitInput by rememberSaveable { mutableStateOf(habit) }
+
+    LaunchedEffect(accessKey) { accessKeyInput = accessKey }
+    LaunchedEffect(category) { categoryInput = category }
+    LaunchedEffect(habit) { habitInput = habit }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         shape = RoundedCornerShape(12.dp),
@@ -339,23 +348,32 @@ private fun SettingsSection(
 
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
-                value = accessKey,
-                onValueChange = onAccessKeyChange,
+                value = accessKeyInput,
+                onValueChange = {
+                    accessKeyInput = it
+                    onAccessKeyChange(it)
+                },
                 singleLine = true,
                 label = { Text("Access key") }
             )
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
-                value = category,
-                onValueChange = onCategoryChange,
+                value = categoryInput,
+                onValueChange = {
+                    categoryInput = it
+                    onCategoryChange(it)
+                },
                 singleLine = true,
                 label = { Text("Category (optional)") },
                 leadingIcon = { Icon(Icons.Filled.Category, contentDescription = null) }
             )
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
-                value = habit,
-                onValueChange = onHabitChange,
+                value = habitInput,
+                onValueChange = {
+                    habitInput = it
+                    onHabitChange(it)
+                },
                 singleLine = true,
                 label = { Text("Habit (optional)") },
                 leadingIcon = { Icon(Icons.Filled.EmojiPeople, contentDescription = null) }
