@@ -101,6 +101,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun syncFromApi() = viewModelScope.launch {
         val key = accessKey.value.trim()
+        val cat = category.value.trim()
+        val hab = habit.value.trim()
         if (key.isEmpty()) {
             lastError.value = "Enter the access key first."
             lastSyncStatus.value = "Sync skipped: no access key."
@@ -109,10 +111,17 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         isSyncing.value = true
         lastSyncStatus.value = "Syncing..."
         try {
+            val localBefore = tasks.value
             val remote = repo.fetchFromApi(key)
+
+            // Push new local items that do not have numeric IDs.
+            val newLocal = localBefore.filter { it.id.isBlank() || it.any { ch -> !ch.isDigit() } }
+            val pushed = repo.pushItems(newLocal, key, cat, hab)
+            val remoteLatest = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else remote
+
             val (cats, habits) = repo.fetchMeta(key)
             repo.clearTasks()
-            repo.saveTasks(remote)
+            repo.saveTasks(mergeRemoteWithLocal(remoteLatest, localBefore, pushed.failed))
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
@@ -120,8 +129,10 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            val ids = remote.joinToString(",") { it.id }
-            lastSyncStatus.value = "Synced ${remote.size} items [ids: $ids]; categories ${cats.size}; habits ${habits.size}."
+            val ids = remoteLatest.joinToString(",") { it.id }
+            val failedCount = pushed.failed.size
+            val failedMsg = if (failedCount > 0) " (failed to push $failedCount)" else ""
+            lastSyncStatus.value = "Synced ${remoteLatest.size} items [ids: $ids]; pushed ${pushed.created.size}$failedMsg; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg
@@ -176,11 +187,10 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         lastSyncStatus.value = "Local tasks cleared."
     }
 
-    private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>): List<TodoItem> {
-        // Remote is the source of truth; only preserve local completion/due date when IDs match.
+    private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>, failedPushes: List<TodoItem> = emptyList()): List<TodoItem> {
         val localMap = local.associateBy { it.id }
 
-        return remote.map { remoteItem ->
+        val merged = remote.map { remoteItem ->
             val localItem = localMap[remoteItem.id]
             if (localItem != null) {
                 remoteItem.copy(
@@ -190,7 +200,15 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 remoteItem
             }
+        }.toMutableList()
+
+        failedPushes.forEach { failed ->
+            if (failed.id.isBlank() || failed.any { !it.isDigit() }) {
+                merged.add(failed)
+            }
         }
+
+        return merged
     }
 
     private fun httpMessage(e: Throwable, fallback: String): String {
