@@ -22,6 +22,8 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
 
     val entries = repo.entriesFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val days = MutableStateFlow<List<WorkoutDay>>(emptyList())
+    val selectedDayKey = MutableStateFlow<String?>(null)
 
     val workoutText = MutableStateFlow("")
     val notesText = MutableStateFlow("")
@@ -61,14 +63,22 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveAccessKey(key.trim())
     }
 
+    fun selectDay(key: String) {
+        selectedDayKey.value = key
+    }
+
     fun syncFromApi() = viewModelScope.launch {
-        val key = accessKey.value.trim()
-        if (key.isEmpty()) {
-            lastError.value = "Enter the access key first."
-            lastSyncStatus.value = "Sync skipped: no access key."
-            return@launch
+        try {
+            val fetched = repo.fetchDays()
+            days.value = fetched.sortedBy { it.sort_order ?: Int.MAX_VALUE }
+            if (selectedDayKey.value == null && fetched.isNotEmpty()) {
+                selectedDayKey.value = fetched.first().day_key
+            }
+            lastSyncStatus.value = "Synced ${fetched.size} days from server."
+            lastError.value = null
+        } catch (e: Exception) {
+            lastError.value = "Sync failed: ${e.message ?: "unknown error"}"
+            lastSyncStatus.value = null
         }
-        // Placeholder until a real API is wired
-        lastSyncStatus.value = "No workout sync API configured yet. Stored key."
     }
 }

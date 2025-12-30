@@ -68,7 +68,15 @@ fun WorkoutScreen(
     val lastErr by vm.lastError.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
+    val days by vm.days.collectAsState()
+    val selectedDayKey by vm.selectedDayKey.collectAsState()
     var currentTab by rememberSaveable { mutableStateOf(WorkoutTab.Log) }
+
+    LaunchedEffect(Unit) {
+        if (days.isEmpty()) {
+            vm.syncFromApi()
+        }
+    }
     Surface(modifier = Modifier.fillMaxSize(), color = WorkoutBg) {
         Column(
             modifier = Modifier
@@ -124,7 +132,9 @@ fun WorkoutScreen(
                     workoutText = workoutText,
                     notesText = notesText,
                     dateText = dateText,
-                    lastErr = lastErr
+                    lastErr = lastErr,
+                    days = days,
+                    selectedDayKey = selectedDayKey
                 )
                 WorkoutTab.Settings -> WorkoutSettingsSection(
                     accessKey = accessKey,
@@ -145,33 +155,12 @@ private fun WorkoutLogSection(
     workoutText: String,
     notesText: String,
     dateText: String,
-    lastErr: String?
+    lastErr: String?,
+    days: List<WorkoutDay>,
+    selectedDayKey: String?
 ) {
-    val availableDates = remember(entries) {
-        entries.mapNotNull { it.date.takeIf { it.isNotBlank() } }
-            .distinct()
-            .sortedWith(compareByDescending<String> { parseDate(it) ?: LocalDate.MIN })
-    }
-    val visibleDates = if (availableDates.isEmpty()) {
-        listOf(dateText.ifBlank { LocalDate.now().toString() })
-    } else {
-        availableDates
-    }
-    var selectedDate by rememberSaveable(visibleDates) {
-        mutableStateOf(visibleDates.first())
-    }
-
-    // When entries change, keep selection to a valid date
-    LaunchedEffect(visibleDates) {
-        if (visibleDates.isNotEmpty() && selectedDate !in visibleDates) {
-            selectedDate = visibleDates.first()
-        }
-    }
-
-    val dayEntries = remember(selectedDate, entries) {
-        entries.filter { it.date == selectedDate }
-    }
     val lastByWorkout = remember(entries) { lastLogByWorkout(entries) }
+    val selectedDay = days.firstOrNull { it.day_key == selectedDayKey }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -253,17 +242,17 @@ private fun WorkoutLogSection(
         }
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(visibleDates.size) { idx ->
-                    val dateStr = visibleDates[idx]
-                    val isSelected = dateStr == selectedDate
+                items(days.size) { idx ->
+                    val day = days[idx]
+                    val isSelected = day.day_key == selectedDayKey
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = if (isSelected) WorkoutAccent else WorkoutPanel,
                         border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.5f)),
-                        onClick = { selectedDate = dateStr }
+                        onClick = { vm.selectDay(day.day_key) }
                     ) {
                         Text(
-                            text = formatDate(dateStr),
+                            text = day.label,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             color = Color.White,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
@@ -275,28 +264,25 @@ private fun WorkoutLogSection(
 
         item {
             Text(
-                text = "Workouts on ${formatDate(selectedDate)}",
+                text = selectedDay?.label ?: "Select a day to see workouts",
                 color = Color.White,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
         }
 
-        if (dayEntries.isEmpty()) {
+        if (selectedDay == null || selectedDay.workouts.isEmpty()) {
             item {
                 Text(
-                    text = "No entries for this day yet. Add one above to start tracking.",
+                    text = "No workouts loaded for this day yet. Hit Sync in Settings to fetch days.",
                     color = Color(0xFFB0B0B0),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
         } else {
-            items(dayEntries) { entry ->
-                WorkoutRow(
-                    entry = entry,
-                    last = lastByWorkout[entry.workout.trim().lowercase()],
-                    onDelete = { vm.deleteEntry(entry.id) }
-                )
+            items(selectedDay.workouts) { move ->
+                val last = lastByWorkout[move.name.trim().lowercase()]
+                WorkoutWorkoutRow(move = move, last = last)
             }
         }
 
@@ -315,6 +301,53 @@ private fun WorkoutLogSection(
                     entry = entry,
                     last = lastByWorkout[entry.workout.trim().lowercase()],
                     onDelete = { vm.deleteEntry(entry.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkoutWorkoutRow(move: WorkoutMove, last: WorkoutEntry?) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = WorkoutPanel,
+        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = move.name,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+            move.type?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (last != null) {
+                val lastLabel = "Last logged ${formatDate(last.date)}"
+                val lastNotes = last.notes.takeIf { it.isNotBlank() }
+                Text(
+                    text = listOfNotNull(lastLabel, lastNotes).joinToString(" – "),
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+            } else {
+                Text(
+                    text = "No history yet. Add an entry with this name to start tracking.",
+                    color = Color(0xFF9E9E9E),
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }

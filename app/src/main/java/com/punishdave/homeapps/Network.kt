@@ -42,6 +42,13 @@ object Network {
         .build()
         .create(TodoApi::class.java)
 
+    val workoutApi: WorkoutApi = Retrofit.Builder()
+        .baseUrl("https://apm.d4c.myftpupload.com/index.php/wp-json/pdswl/v1/")
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .client(client)
+        .build()
+        .create(WorkoutApi::class.java)
+
     // DataStore JSON adapters
     val weekAdapter = moshi.adapter(WeekResponse::class.java)
 
