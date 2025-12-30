@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,16 +30,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private val WorkoutBg = Color(0xFF1C1C1C)
 private val WorkoutPanel = Color(0xFF0F0F0F)
 private val WorkoutAccent = Color(0xFFB00020)
+private val DateDisplayFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM")
 
 @Composable
 fun WorkoutScreen(
@@ -50,6 +59,26 @@ fun WorkoutScreen(
     val notesText by vm.notesText.collectAsState()
     val dateText by vm.dateText.collectAsState()
     val lastErr by vm.lastError.collectAsState()
+    val availableDates = remember(entries) {
+        entries.mapNotNull { it.date.takeIf { it.isNotBlank() } }
+            .distinct()
+            .sortedWith(compareByDescending<String> { parseDate(it) ?: LocalDate.MIN })
+    }
+    var selectedDate by rememberSaveable(availableDates) {
+        mutableStateOf(availableDates.firstOrNull() ?: dateText)
+    }
+
+    // When entries change, keep selection to a valid date
+    LaunchedEffect(availableDates) {
+        if (availableDates.isNotEmpty() && selectedDate !in availableDates) {
+            selectedDate = availableDates.first()
+        }
+    }
+
+    val dayEntries = remember(selectedDate, entries) {
+        entries.filter { it.date == selectedDate }
+    }
+    val lastByWorkout = remember(entries) { lastLogByWorkout(entries) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = WorkoutBg) {
         Column(
@@ -148,17 +177,91 @@ fun WorkoutScreen(
                     color = Color(0xFFB0B0B0),
                     style = MaterialTheme.typography.bodyMedium
                 )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(entries) { entry ->
+                return@Column
+            }
+
+            // Day selector
+            Text(
+                text = "Available days",
+                color = Color.White,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(availableDates.size) { idx ->
+                            val dateStr = availableDates[idx]
+                            val isSelected = dateStr == selectedDate
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) WorkoutAccent else WorkoutPanel,
+                                border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.5f)),
+                                onClick = { selectedDate = dateStr }
+                            ) {
+                                Text(
+                                    text = formatDate(dateStr),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    color = Color.White,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Selected day details
+                item {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Workouts on ${formatDate(selectedDate)}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                if (dayEntries.isEmpty()) {
+                    item {
+                        Text(
+                            text = "No entries for this day yet.",
+                            color = Color(0xFFB0B0B0),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                } else {
+                    items(dayEntries) { entry ->
                         WorkoutRow(
                             entry = entry,
+                            last = lastByWorkout[entry.workout.trim().lowercase()],
                             onDelete = { vm.deleteEntry(entry.id) }
                         )
                     }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "All entries (latest first)",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                items(entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })) { entry ->
+                    WorkoutRow(
+                        entry = entry,
+                        last = lastByWorkout[entry.workout.trim().lowercase()],
+                        onDelete = { vm.deleteEntry(entry.id) }
+                    )
                 }
             }
         }
@@ -168,6 +271,7 @@ fun WorkoutScreen(
 @Composable
 private fun WorkoutRow(
     entry: WorkoutEntry,
+    last: WorkoutEntry?,
     onDelete: () -> Unit
 ) {
     Surface(
@@ -213,6 +317,36 @@ private fun WorkoutRow(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+
+            if (last != null) {
+                val lastLabel = if (last.date == entry.date) "Last logged today" else "Last logged ${formatDate(last.date)}"
+                val lastNotes = last.notes.takeIf { it.isNotBlank() }
+                Text(
+                    text = listOfNotNull(lastLabel, lastNotes).joinToString(" – "),
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
+}
+
+private fun parseDate(raw: String): LocalDate? = runCatching { LocalDate.parse(raw) }.getOrNull()
+
+private fun formatDate(raw: String): String {
+    val parsed = parseDate(raw)
+    return parsed?.format(DateDisplayFmt) ?: raw
+}
+
+private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEntry> {
+    val sorted = entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })
+    val map = mutableMapOf<String, WorkoutEntry>()
+    for (e in sorted) {
+        val key = e.workout.trim().lowercase()
+        if (key.isNotEmpty() && key !in map) {
+            map[key] = e
+        }
+    }
+    return map
 }
