@@ -203,7 +203,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         }.toMutableList()
 
         failedPushes.forEach { failed ->
-            if (failed.id.isBlank() || failed.any { !it.isDigit() }) {
+            if (failed.id.isBlank() || failed.id.any { !it.isDigit() }) {
                 merged.add(failed)
             }
         }
