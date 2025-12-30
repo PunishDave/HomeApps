@@ -8,7 +8,7 @@ class TodoRepository(
     private val store: ToDoStore,
     private val api: TodoApi = Network.todoApi
 ) {
-    data class PushResult(val created: List<TodoItem>, val failed: Int)
+    data class PushResult(val created: List<TodoItem>, val failed: List<TodoItem>)
 
     fun tasksFlow() = store.tasksFlow
     fun accessKeyFlow() = store.accessKeyFlow
@@ -56,9 +56,9 @@ class TodoRepository(
     }
 
     suspend fun pushUnsynced(local: List<TodoItem>, key: String, category: String, habit: String): PushResult {
-        if (key.isBlank()) return PushResult(emptyList(), 0)
+        if (key.isBlank()) return PushResult(emptyList(), emptyList())
         val created = mutableListOf<TodoItem>()
-        var failed = 0
+        val failed = mutableListOf<TodoItem>()
 
         val categoryOptions = store.categoryOptionsFlow.firstOrNull().orEmpty()
         val habitOptions = store.habitOptionsFlow.firstOrNull().orEmpty()
@@ -79,7 +79,7 @@ class TodoRepository(
             }.getOrNull()
 
             if (remote == null) {
-                failed += 1
+                failed += item
                 continue
             }
 

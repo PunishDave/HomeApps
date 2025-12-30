@@ -115,7 +115,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             val pushedResult = repo.pushUnsynced(localBefore, key, cat, hab)
             val remote = repo.fetchFromApi(key)
             val (cats, habits) = repo.fetchMeta(key)
-            val merged = mergeRemoteWithLocal(remote, localBefore)
+            val merged = mergeRemoteWithLocal(remote, localBefore, pushedResult.failed)
             repo.saveTasks(merged)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
@@ -124,7 +124,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            val failedPushMsg = if (pushedResult.failed > 0) " (failed to push ${pushedResult.failed})" else ""
+            val failedCount = pushedResult.failed.size
+            val failedPushMsg = if (failedCount > 0) " (failed to push $failedCount)" else ""
             lastSyncStatus.value = "Synced ${remote.size} items; pushed ${pushedResult.created.size}$failedPushMsg; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
@@ -175,12 +176,11 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveTasks(updated)
     }
 
-    private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>): List<TodoItem> {
-        if (remote.isEmpty()) return emptyList()
-
+    private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>, failedPushes: List<TodoItem> = emptyList()): List<TodoItem> {
+        // Use remote as source of truth, but keep any local items that failed to push (non-numeric IDs).
         val localMap = local.associateBy { it.id }
 
-        return remote.map { remoteItem ->
+        val merged = remote.map { remoteItem ->
             val localItem = localMap[remoteItem.id]
             if (localItem != null) {
                 remoteItem.copy(
@@ -190,7 +190,16 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 remoteItem
             }
+        }.toMutableList()
+
+        // Keep failed push items visible so the user knows they didn't sync.
+        failedPushes.forEach { failed ->
+            if (failed.id.isBlank() || failed.id.any { !it.isDigit() }) {
+                merged.add(failed)
+            }
         }
+
+        return merged
     }
 
     private fun httpMessage(e: Throwable, fallback: String): String {
