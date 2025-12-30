@@ -101,6 +101,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun syncFromApi() = viewModelScope.launch {
         val key = accessKey.value.trim()
+        val cat = category.value.trim()
+        val hab = habit.value.trim()
         if (key.isEmpty()) {
             lastError.value = "Enter the access key first."
             lastSyncStatus.value = "Sync skipped: no access key."
@@ -109,10 +111,11 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         isSyncing.value = true
         lastSyncStatus.value = "Syncing..."
         try {
+            val localBefore = tasks.value
+            val pushed = repo.pushUnsynced(localBefore, key, cat, hab)
             val remote = repo.fetchFromApi(key)
             val (cats, habits) = repo.fetchMeta(key)
-            val local = tasks.value
-            val merged = mergeRemoteWithLocal(remote, local)
+            val merged = mergeRemoteWithLocal(remote, localBefore)
             repo.saveTasks(merged)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
@@ -121,7 +124,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            lastSyncStatus.value = "Synced ${remote.size} items; categories ${cats.size}; habits ${habits.size}."
+            lastSyncStatus.value = "Synced ${remote.size} items; pushed ${pushed.size}; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg

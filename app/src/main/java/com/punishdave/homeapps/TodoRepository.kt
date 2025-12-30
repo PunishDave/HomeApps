@@ -52,6 +52,37 @@ class TodoRepository(
         }
     }
 
+    suspend fun pushUnsynced(local: List<TodoItem>, key: String, category: String, habit: String): List<TodoItem> {
+        if (key.isBlank()) return emptyList()
+        val created = mutableListOf<TodoItem>()
+        for (item in local) {
+            val needsPush = item.id.isBlank() || item.id.any { ch -> !ch.isDigit() }
+            if (!needsPush) continue
+
+            val remote = runCatching {
+                createRemote(
+                    title = item.title,
+                    key = key,
+                    category = category,
+                    habit = habit,
+                    dueDate = item.dueDate.orEmpty()
+                )
+            }.getOrNull()
+
+            if (remote != null) {
+                var finalItem = remote
+                if (item.done && !remote.done) {
+                    val updated = runCatching { updateStatusRemote(remote.id, true, key) }.getOrNull()
+                    if (updated != null) {
+                        finalItem = updated
+                    }
+                }
+                created += finalItem
+            }
+        }
+        return created
+    }
+
     suspend fun updateStatusRemote(id: String, done: Boolean, key: String): TodoItem? {
         val intId = id.toIntOrNull() ?: return null
         val status = if (done) "done" else "pending"
