@@ -119,12 +119,15 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 item.id.isBlank() || item.id.any { ch -> !ch.isDigit() }
             }
             val pushed = repo.pushItems(newLocal, key, cat, hab)
-            val remoteLatest = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else remote
+            val remoteAfterPush = if (pushed.created.isNotEmpty()) repo.fetchFromApi(key) else remote
+            val remoteLatest = if (remoteAfterPush.isNotEmpty()) remoteAfterPush else remote + pushed.created
 
             val (cats, habits) = repo.fetchMeta(key)
             repo.clearTasks()
             val failedExtras = pushed.failed.filter { it.id.isBlank() || it.id.any { ch -> !ch.isDigit() } }
-            repo.saveTasks(remoteLatest + failedExtras)
+            // Deduplicate by id to avoid double entries if fallback combined lists.
+            val merged = (remoteLatest + failedExtras).associateBy { it.id.ifBlank { it.title.lowercase() } }.values.toList()
+            repo.saveTasks(merged)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
