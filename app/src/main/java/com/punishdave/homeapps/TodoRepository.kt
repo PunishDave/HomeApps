@@ -3,6 +3,9 @@ package com.punishdave.homeapps
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Request
+import com.squareup.moshi.Types
 
 class TodoRepository(
     private val store: ToDoStore,
@@ -29,20 +32,27 @@ class TodoRepository(
     suspend fun fetchFromApi(key: String): List<TodoItem> {
         if (key.isBlank()) return emptyList()
         return withContext(Dispatchers.IO) {
-            val perPage = 100
-            val all = mutableListOf<TodoRemoteItem>()
-            var page = 1
-            while (true) {
-                val batch = api.listItems(
-                    key = key,
-                    perPage = perPage,
-                    page = page
+            val url = Network.TODO_BASE.toHttpUrl().newBuilder()
+                .addPathSegment("items")
+                .addQueryParameter("per_page", "100")
+                .addQueryParameter("pd_todo_key", key)
+                .build()
+
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("X-PD-Todo-Key", key)
+                .build()
+
+            Network.client.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext emptyList()
+                val body = resp.body?.string().orEmpty()
+                val adapter = Network.moshi.adapter<List<TodoRemoteItem>>(
+                    Types.newParameterizedType(List::class.java, TodoRemoteItem::class.java)
                 )
-                all.addAll(batch)
-                if (batch.size < perPage) break
-                page += 1
+                val parsed = runCatching { adapter.fromJson(body) }.getOrNull().orEmpty()
+                parsed.map { it.toLocal() }
             }
-            all.map { it.toLocal() }
         }
     }
 

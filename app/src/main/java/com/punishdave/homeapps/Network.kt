@@ -41,6 +41,7 @@ object Network {
         .client(client)
         .build()
         .create(TodoApi::class.java)
+    const val TODO_BASE = "https://apm.d4c.myftpupload.com/index.php/wp-json/pd-todo/v1/"
 
     val workoutApi: WorkoutApi = Retrofit.Builder()
         .baseUrl("https://apm.d4c.myftpupload.com/index.php/wp-json/pdswl/v1/")
