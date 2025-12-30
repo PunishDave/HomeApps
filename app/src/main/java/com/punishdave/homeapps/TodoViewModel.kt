@@ -109,11 +109,9 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         isSyncing.value = true
         lastSyncStatus.value = "Syncing..."
         try {
-            val localBefore = tasks.value
             val remote = repo.fetchFromApi(key)
             val (cats, habits) = repo.fetchMeta(key)
-            val merged = mergeRemoteWithLocal(remote, localBefore)
-            repo.saveTasks(merged)
+            repo.saveTasks(remote)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
