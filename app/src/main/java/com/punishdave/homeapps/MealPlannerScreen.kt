@@ -42,7 +42,7 @@ fun MealPlannerMenuScreen(
     onBack: () -> Unit,
     onOpenCurrentWeek: () -> Unit,
     onOpenPlanWeek: () -> Unit,
-    onSync: () -> Unit // kept for compatibility; we call VM directly anyway
+    onSync: () -> Unit
 ) {
     val vm: MealPlannerViewModel = viewModel()
     val syncing by vm.isSyncing.collectAsState()
@@ -118,7 +118,11 @@ fun MealPlannerMenuScreen(
 
             BottomBarBackSync(
                 onBack = onBack,
-                onSync = { vm.sync() } // <— real wiring
+                // notify caller and also trigger the actual sync in the VM
+                onSync = {
+                    onSync()
+                    vm.sync()
+                }
             )
         }
     }
@@ -335,7 +339,10 @@ fun MealPlannerPlanWeekScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 FilledTonalButton(
-                    onClick = { vm.generateWeek() }, // hits /random-week and stores planned week
+                    onClick = {
+                        onGenerate()
+                        vm.generateWeek() // hits /random-week and stores planned week
+                    },
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = Accent.copy(alpha = 0.55f),
                         contentColor = Color.White
@@ -362,6 +369,7 @@ fun MealPlannerPlanWeekScreen(
                             meals = meals
                         )
                         vm.savePlannedWeekLocal(week)
+                        onSave()
                     },
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = Accent.copy(alpha = 0.55f),
