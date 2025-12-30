@@ -69,11 +69,6 @@ fun WorkoutScreen(
     val selectedDayKey by vm.selectedDayKey.collectAsState()
     var currentTab by rememberSaveable { mutableStateOf(WorkoutTab.Log) }
 
-    LaunchedEffect(Unit) {
-        if (days.isEmpty()) {
-            vm.syncFromApi()
-        }
-    }
     Surface(modifier = Modifier.fillMaxSize(), color = WorkoutBg) {
         Column(
             modifier = Modifier
@@ -203,6 +198,24 @@ private fun WorkoutLogSection(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+        if (selectedDay != null) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    FilledIconButton(
+                        onClick = { vm.pushDay(selectedDay.day_key) },
+                        colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                            containerColor = WorkoutAccent,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(Icons.Filled.Sync, contentDescription = "Push day to API")
+                    }
+                }
+            }
         }
 
         if (selectedDay == null || selectedDay.workouts.isEmpty()) {

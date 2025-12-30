@@ -22,7 +22,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
 
     val entries = repo.entriesFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
-    val days = MutableStateFlow<List<WorkoutDay>>(emptyList())
+    val days = repo.daysFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val selectedDayKey = MutableStateFlow<String?>(null)
 
     val workoutText = MutableStateFlow("")
@@ -97,8 +97,8 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
         try {
-            val fetched = repo.fetchDays(key)
-            days.value = fetched.sortedBy { it.sort_order ?: Int.MAX_VALUE }
+            val fetched = repo.fetchDays(key).sortedBy { it.sort_order ?: Int.MAX_VALUE }
+            repo.saveDays(fetched)
             if (selectedDayKey.value == null && fetched.isNotEmpty()) {
                 selectedDayKey.value = fetched.first().day_key
             }
@@ -112,6 +112,17 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             lastError.value = "Sync failed: ${e.message ?: "unknown error"}"
             lastSyncStatus.value = null
+        }
+    }
+
+    fun pushDay(dayKey: String) = viewModelScope.launch {
+        val key = accessKey.value.trim().ifEmpty { null }
+        val day = days.value.firstOrNull { it.day_key == dayKey } ?: return@launch
+        try {
+            repo.pushDay(day, key)
+            lastError.value = null
+        } catch (e: Exception) {
+            lastError.value = "Push failed: ${e.message}"
         }
     }
 }

@@ -15,12 +15,15 @@ private val Context.workoutDataStore by preferencesDataStore(name = "workout_sto
 class WorkoutStore(private val context: Context) {
     private val KEY_ENTRIES = stringPreferencesKey("workout_entries_json")
     private val KEY_ACCESS = stringPreferencesKey("workout_access_key")
+    private val KEY_DAYS = stringPreferencesKey("workout_days_json")
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
     private val listType = Types.newParameterizedType(List::class.java, WorkoutEntry::class.java)
     private val adapter = moshi.adapter<List<WorkoutEntry>>(listType)
+    private val daysType = Types.newParameterizedType(List::class.java, WorkoutDay::class.java)
+    private val daysAdapter = moshi.adapter<List<WorkoutDay>>(daysType)
 
     val entriesFlow: Flow<List<WorkoutEntry>> = context.workoutDataStore.data.map { prefs ->
         val raw = prefs[KEY_ENTRIES]
@@ -32,11 +35,21 @@ class WorkoutStore(private val context: Context) {
         prefs[KEY_ACCESS] ?: ""
     }
 
+    val daysFlow: Flow<List<WorkoutDay>> = context.workoutDataStore.data.map { prefs ->
+        val raw = prefs[KEY_DAYS]
+        if (raw.isNullOrEmpty()) return@map emptyList()
+        runCatching { daysAdapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
+    }
+
     suspend fun saveEntries(entries: List<WorkoutEntry>) {
         context.workoutDataStore.edit { it[KEY_ENTRIES] = adapter.toJson(entries) }
     }
 
     suspend fun saveAccessKey(key: String) {
         context.workoutDataStore.edit { it[KEY_ACCESS] = key }
+    }
+
+    suspend fun saveDays(days: List<WorkoutDay>) {
+        context.workoutDataStore.edit { it[KEY_DAYS] = daysAdapter.toJson(days) }
     }
 }

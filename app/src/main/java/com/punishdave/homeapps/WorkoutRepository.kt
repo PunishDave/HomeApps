@@ -3,6 +3,7 @@ package com.punishdave.homeapps
 class WorkoutRepository(private val store: WorkoutStore) {
     fun entriesFlow() = store.entriesFlow
     fun accessKeyFlow() = store.accessKeyFlow
+    fun daysFlow() = store.daysFlow
 
     suspend fun save(entries: List<WorkoutEntry>) {
         store.saveEntries(entries)
@@ -10,6 +11,10 @@ class WorkoutRepository(private val store: WorkoutStore) {
 
     suspend fun saveAccessKey(key: String) {
         store.saveAccessKey(key)
+    }
+
+    suspend fun saveDays(days: List<WorkoutDay>) {
+        store.saveDays(days)
     }
 
     suspend fun fetchDays(key: String?): List<WorkoutDay> {
@@ -22,6 +27,27 @@ class WorkoutRepository(private val store: WorkoutStore) {
             altQuery = key,
             plainKey = key,
             accessKey = key
+        )
+    }
+
+    suspend fun pushDay(day: WorkoutDay, key: String?): WorkoutDay {
+        val bearer = key?.let { "Bearer $it" }
+        val body = WorkoutDayPost(
+            label = day.label,
+            icon = day.icon,
+            sort_order = day.sort_order,
+            workouts = day.workouts
+        )
+        return Network.workoutApi.upsertDay(
+            dayKey = day.day_key,
+            key = key,
+            altHeader = key,
+            bearer = bearer,
+            keyQuery = key,
+            altQuery = key,
+            plainKey = key,
+            accessKey = key,
+            body = body
         )
     }
 }
