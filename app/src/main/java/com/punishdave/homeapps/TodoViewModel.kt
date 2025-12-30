@@ -26,6 +26,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     val habit = repo.habitFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val categoryOptions = repo.categoryOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val habitOptions = repo.habitOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val baseUrl = repo.baseUrlFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoRepository.DEFAULT_TODO_BASE)
     val newTaskText = MutableStateFlow("")
     val dueDateText = MutableStateFlow(java.time.LocalDate.now().toString())
     val isSyncing = MutableStateFlow(false)
@@ -97,6 +98,10 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveHabit(habit: String) = viewModelScope.launch {
         repo.saveHabit(habit.trim())
+    }
+
+    fun saveBaseUrl(url: String) = viewModelScope.launch {
+        repo.saveBaseUrl(url.trim())
     }
 
     fun syncFromApi() = viewModelScope.launch {

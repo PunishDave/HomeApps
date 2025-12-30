@@ -84,6 +84,7 @@ fun TodoScreen(
     val habit by vm.habit.collectAsState()
     val categoryOptions by vm.categoryOptions.collectAsState()
     val habitOptions by vm.habitOptions.collectAsState()
+    val baseUrl by vm.baseUrl.collectAsState()
     val dueDate by vm.dueDateText.collectAsState()
     val isSyncing by vm.isSyncing.collectAsState()
     val lastErr by vm.lastError.collectAsState()
@@ -163,9 +164,11 @@ fun TodoScreen(
                     isSyncing = isSyncing,
                     lastErr = lastErr,
                     lastSync = lastSync,
+                    baseUrl = baseUrl,
                     onAccessKeyChange = { vm.saveAccessKey(it) },
                     onCategoryChange = { vm.saveCategory(it) },
                     onHabitChange = { vm.saveHabit(it) },
+                    onBaseUrlChange = { vm.saveBaseUrl(it) },
                     onSync = { vm.syncFromApi() },
                     onClearLocal = { vm.clearLocalData() }
                 )
@@ -341,19 +344,23 @@ private fun SettingsSection(
     isSyncing: Boolean,
     lastErr: String?,
     lastSync: String?,
+    baseUrl: String,
     onAccessKeyChange: (String) -> Unit,
     onCategoryChange: (String) -> Unit,
     onHabitChange: (String) -> Unit,
+    onBaseUrlChange: (String) -> Unit,
     onSync: () -> Unit,
     onClearLocal: () -> Unit
 ) {
     var accessKeyInput by rememberSaveable { mutableStateOf(accessKey) }
     var categoryInput by rememberSaveable { mutableStateOf(category) }
     var habitInput by rememberSaveable { mutableStateOf(habit) }
+    var baseUrlInput by rememberSaveable { mutableStateOf(baseUrl) }
 
     LaunchedEffect(accessKey) { accessKeyInput = accessKey }
     LaunchedEffect(category) { categoryInput = category }
     LaunchedEffect(habit) { habitInput = habit }
+    LaunchedEffect(baseUrl) { baseUrlInput = baseUrl }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -384,6 +391,16 @@ private fun SettingsSection(
                 },
                 singleLine = true,
                 label = { Text("Access key") }
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = baseUrlInput,
+                onValueChange = {
+                    baseUrlInput = it
+                    onBaseUrlChange(it)
+                },
+                singleLine = true,
+                label = { Text("API base URL") }
             )
             DropdownOrTextField(
                 label = "Category (optional)",

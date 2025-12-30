@@ -9,7 +9,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
 object Network {
-    private val moshi: Moshi = Moshi.Builder()
+    val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
 
@@ -17,7 +17,7 @@ object Network {
         level = HttpLoggingInterceptor.Level.BASIC
     }
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
+    val client: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor(logging)
         .build()
 
