@@ -64,14 +64,19 @@ fun WorkoutScreen(
             .distinct()
             .sortedWith(compareByDescending<String> { parseDate(it) ?: LocalDate.MIN })
     }
-    var selectedDate by rememberSaveable(availableDates) {
-        mutableStateOf(availableDates.firstOrNull() ?: dateText)
+    val visibleDates = if (availableDates.isEmpty()) {
+        listOf(dateText.ifBlank { LocalDate.now().toString() })
+    } else {
+        availableDates
+    }
+    var selectedDate by rememberSaveable(visibleDates) {
+        mutableStateOf(visibleDates.first())
     }
 
     // When entries change, keep selection to a valid date
     LaunchedEffect(availableDates) {
-        if (availableDates.isNotEmpty() && selectedDate !in availableDates) {
-            selectedDate = availableDates.first()
+        if (visibleDates.isNotEmpty() && selectedDate !in visibleDates) {
+            selectedDate = visibleDates.first()
         }
     }
 
@@ -171,15 +176,6 @@ fun WorkoutScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (entries.isEmpty()) {
-                Text(
-                    text = "No workouts logged yet. Add your last session.",
-                    color = Color(0xFFB0B0B0),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                return@Column
-            }
-
             // Day selector
             Text(
                 text = "Available days",
@@ -196,8 +192,8 @@ fun WorkoutScreen(
                     androidx.compose.foundation.lazy.LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(availableDates.size) { idx ->
-                            val dateStr = availableDates[idx]
+                        items(visibleDates.size) { idx ->
+                            val dateStr = visibleDates[idx]
                             val isSelected = dateStr == selectedDate
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -230,7 +226,7 @@ fun WorkoutScreen(
                 if (dayEntries.isEmpty()) {
                     item {
                         Text(
-                            text = "No entries for this day yet.",
+                            text = "No entries for this day yet. Add one above to start tracking.",
                             color = Color(0xFFB0B0B0),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(vertical = 8.dp)
@@ -246,22 +242,24 @@ fun WorkoutScreen(
                     }
                 }
 
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "All entries (latest first)",
-                        color = Color.White,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                if (entries.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "All entries (latest first)",
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
 
-                items(entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })) { entry ->
-                    WorkoutRow(
-                        entry = entry,
-                        last = lastByWorkout[entry.workout.trim().lowercase()],
-                        onDelete = { vm.deleteEntry(entry.id) }
-                    )
+                    items(entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })) { entry ->
+                        WorkoutRow(
+                            entry = entry,
+                            last = lastByWorkout[entry.workout.trim().lowercase()],
+                            onDelete = { vm.deleteEntry(entry.id) }
+                        )
+                    }
                 }
             }
         }
