@@ -111,6 +111,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         try {
             val remote = repo.fetchFromApi(key)
             val (cats, habits) = repo.fetchMeta(key)
+            repo.clearTasks()
             repo.saveTasks(remote)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
@@ -119,7 +120,8 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            lastSyncStatus.value = "Synced ${remote.size} items; categories ${cats.size}; habits ${habits.size}."
+            val ids = remote.joinToString(",") { it.id }
+            lastSyncStatus.value = "Synced ${remote.size} items [ids: $ids]; categories ${cats.size}; habits ${habits.size}."
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg
