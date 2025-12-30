@@ -123,7 +123,8 @@ fun WorkoutScreen(
                     entries = entries,
                     lastErr = lastErr,
                     days = days,
-                    selectedDayKey = selectedDayKey
+                    selectedDayKey = selectedDayKey,
+                    lastSyncStatus = lastSync
                 )
                 WorkoutTab.Settings -> WorkoutSettingsSection(
                     accessKey = accessKey,
@@ -143,7 +144,8 @@ private fun WorkoutLogSection(
     entries: List<WorkoutEntry>,
     lastErr: String?,
     days: List<WorkoutDay>,
-    selectedDayKey: String?
+    selectedDayKey: String?,
+    lastSyncStatus: String?
 ) {
     val selectedDay = days.firstOrNull { it.day_key == selectedDayKey }
 
@@ -160,10 +162,10 @@ private fun WorkoutLogSection(
                 )
             }
         }
-        item {
-            lastSyncStatus?.takeIf { it.isNotBlank() }?.let {
+        lastSyncStatus?.takeIf { it.isNotBlank() }?.let { status ->
+            item {
                 Text(
-                    text = it,
+                    text = status,
                     color = Color(0xFFBDBDBD),
                     style = MaterialTheme.typography.bodySmall
                 )
