@@ -546,22 +546,31 @@ private fun TodoRow(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = task.title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                task.dueDate?.takeIf { it.isNotBlank() }?.let { due ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = "Due: $due",
-                        color = Color(0xFFBDBDBD),
-                        style = MaterialTheme.typography.bodySmall
+                        text = task.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                    task.dueDate?.takeIf { it.isNotBlank() }?.let { due ->
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = due,
+                            color = Color(0xFFBDBDBD),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
                 if (task.done) {
                     Text(
