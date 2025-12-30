@@ -68,8 +68,14 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun syncFromApi() = viewModelScope.launch {
+        val key = accessKey.value.trim().ifEmpty { null }
+        if (key == null) {
+            lastError.value = "Enter the workout access key in Settings, then tap Sync."
+            lastSyncStatus.value = null
+            return@launch
+        }
         try {
-            val fetched = repo.fetchDays()
+            val fetched = repo.fetchDays(key)
             days.value = fetched.sortedBy { it.sort_order ?: Int.MAX_VALUE }
             if (selectedDayKey.value == null && fetched.isNotEmpty()) {
                 selectedDayKey.value = fetched.first().day_key

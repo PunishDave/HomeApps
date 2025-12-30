@@ -12,7 +12,7 @@ class WorkoutRepository(private val store: WorkoutStore) {
         store.saveAccessKey(key)
     }
 
-    suspend fun fetchDays(): List<WorkoutDay> {
-        return Network.workoutApi.listDays()
+    suspend fun fetchDays(key: String?): List<WorkoutDay> {
+        return Network.workoutApi.listDays(key = key, keyQuery = key)
     }
 }

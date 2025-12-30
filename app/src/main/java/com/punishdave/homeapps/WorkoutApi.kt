@@ -2,10 +2,15 @@ package com.punishdave.homeapps
 
 import com.squareup.moshi.JsonClass
 import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.Query
 
 interface WorkoutApi {
     @GET("days")
-    suspend fun listDays(): List<WorkoutDay>
+    suspend fun listDays(
+        @Header("X-PD-SWL-Key") key: String? = null,
+        @Query("pd_swl_key") keyQuery: String? = key
+    ): List<WorkoutDay>
 }
 
 @JsonClass(generateAdapter = true)
