@@ -217,7 +217,7 @@ private fun WorkoutLogSection(
                     horizontalArrangement = Arrangement.End
                 ) {
                     FilledIconButton(
-                        onClick = { vm.pushDay(selectedDay.day_key) },
+                        onClick = { vm.pushEntriesForDay(selectedDay.day_key) },
                         colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
                             containerColor = WorkoutAccent,
                             contentColor = Color.White

@@ -32,6 +32,18 @@ interface WorkoutApi {
         @Query("access_key") accessKey: String? = key,
         @Body body: WorkoutDayPost
     ): WorkoutDay
+
+    @POST("entries/push")
+    suspend fun pushEntries(
+        @Header("X-PD-SWL-Key") key: String? = null,
+        @Header("X-PDSWL-Key") altHeader: String? = null,
+        @Header("Authorization") bearer: String? = null,
+        @Query("pd_swl_key") keyQuery: String? = key,
+        @Query("pdswl_key") altQuery: String? = key,
+        @Query("key") plainKey: String? = key,
+        @Query("access_key") accessKey: String? = key,
+        @Body body: WorkoutEntriesPush
+    )
 }
 
 @JsonClass(generateAdapter = true)
@@ -40,6 +52,20 @@ data class WorkoutDayPost(
     val icon: String? = null,
     val sort_order: Int? = null,
     val workouts: List<WorkoutMove>
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkoutEntriesPush(
+    val entries: List<WorkoutEntryPayload>
+)
+
+@JsonClass(generateAdapter = true)
+data class WorkoutEntryPayload(
+    val workout: String,
+    val weight: String? = null,
+    val reps: Int? = null,
+    val performed_on: String,
+    val notes: String? = null
 )
 
 @JsonClass(generateAdapter = true)

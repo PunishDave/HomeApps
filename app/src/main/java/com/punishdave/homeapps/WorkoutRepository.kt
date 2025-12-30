@@ -50,4 +50,29 @@ class WorkoutRepository(private val store: WorkoutStore) {
             body = body
         )
     }
+
+    suspend fun pushEntries(entries: List<WorkoutEntry>, key: String?) {
+        val bearer = key?.let { "Bearer $it" }
+        val payload = WorkoutEntriesPush(
+            entries = entries.map {
+                WorkoutEntryPayload(
+                    workout = it.workout,
+                    weight = it.notes.takeIf { notes -> notes.isNotBlank() },
+                    reps = null,
+                    performed_on = it.date,
+                    notes = it.notes.takeIf { notes -> notes.isNotBlank() }
+                )
+            }
+        )
+        Network.workoutApi.pushEntries(
+            key = key,
+            altHeader = key,
+            bearer = bearer,
+            keyQuery = key,
+            altQuery = key,
+            plainKey = key,
+            accessKey = key,
+            body = payload
+        )
+    }
 }

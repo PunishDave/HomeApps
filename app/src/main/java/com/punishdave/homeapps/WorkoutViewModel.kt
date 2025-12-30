@@ -136,4 +136,30 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             lastSyncStatus.value = null
         }
     }
+
+    fun pushEntriesForDay(dayKey: String?) = viewModelScope.launch {
+        val key = accessKey.value.trim().ifEmpty { null }
+        if (key == null) {
+            lastError.value = "Enter the workout access key in Settings, then tap Sync/Push."
+            return@launch
+        }
+        val filtered = if (dayKey == null) {
+            entries.value
+        } else {
+            val dayWorkouts = days.value.firstOrNull { it.day_key == dayKey }?.workouts?.map { it.name.lowercase() }?.toSet()
+            if (dayWorkouts.isNullOrEmpty()) entries.value else entries.value.filter { it.workout.lowercase() in dayWorkouts }
+        }
+        if (filtered.isEmpty()) {
+            lastError.value = "No entries to push for this day."
+            return@launch
+        }
+        try {
+            repo.pushEntries(filtered, key)
+            lastSyncStatus.value = "Pushed ${filtered.size} entries."
+            lastError.value = null
+        } catch (e: Exception) {
+            lastError.value = "Push failed: ${e.message}"
+            lastSyncStatus.value = null
+        }
+    }
 }
