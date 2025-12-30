@@ -62,6 +62,10 @@ class ToDoStore(private val context: Context) {
         context.todoDataStore.edit { it[KEY_TASKS] = adapter.toJson(tasks) }
     }
 
+    suspend fun clearTasks() {
+        context.todoDataStore.edit { it.remove(KEY_TASKS) }
+    }
+
     suspend fun saveAccessKey(key: String) {
         context.todoDataStore.edit { it[KEY_ACCESS] = key }
     }

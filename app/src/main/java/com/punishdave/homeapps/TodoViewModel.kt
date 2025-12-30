@@ -187,6 +187,11 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveTasks(updated)
     }
 
+    fun clearLocalData() = viewModelScope.launch {
+        repo.clearTasks()
+        lastSyncStatus.value = "Local tasks cleared."
+    }
+
     private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>, failedPushes: List<TodoItem> = emptyList()): List<TodoItem> {
         // Use remote as source of truth, but keep any local items that failed to push (non-numeric IDs).
         val localMap = local.associateBy { it.id }

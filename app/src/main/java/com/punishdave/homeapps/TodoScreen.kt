@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiPeople
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -165,7 +166,8 @@ fun TodoScreen(
                     onAccessKeyChange = { vm.saveAccessKey(it) },
                     onCategoryChange = { vm.saveCategory(it) },
                     onHabitChange = { vm.saveHabit(it) },
-                    onSync = { vm.syncFromApi() }
+                    onSync = { vm.syncFromApi() },
+                    onClearLocal = { vm.clearLocalData() }
                 )
             }
 
@@ -342,7 +344,8 @@ private fun SettingsSection(
     onAccessKeyChange: (String) -> Unit,
     onCategoryChange: (String) -> Unit,
     onHabitChange: (String) -> Unit,
-    onSync: () -> Unit
+    onSync: () -> Unit,
+    onClearLocal: () -> Unit
 ) {
     var accessKeyInput by rememberSaveable { mutableStateOf(accessKey) }
     var categoryInput by rememberSaveable { mutableStateOf(category) }
@@ -405,8 +408,15 @@ private fun SettingsSection(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                OutlinedButton(
+                    onClick = onClearLocal,
+                    enabled = !isSyncing
+                ) {
+                    Text("Clear local tasks")
+                }
                 FilledIconButton(
                     onClick = onSync,
                     enabled = !isSyncing,

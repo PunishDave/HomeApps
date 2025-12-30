@@ -18,6 +18,7 @@ class TodoRepository(
     fun habitOptionsFlow() = store.habitOptionsFlow
 
     suspend fun saveTasks(tasks: List<TodoItem>) = withContext(Dispatchers.IO) { store.saveTasks(tasks) }
+    suspend fun clearTasks() = withContext(Dispatchers.IO) { store.clearTasks() }
     suspend fun saveAccessKey(key: String) = withContext(Dispatchers.IO) { store.saveAccessKey(key) }
     suspend fun saveCategory(cat: String) = withContext(Dispatchers.IO) { store.saveCategory(cat) }
     suspend fun saveHabit(habit: String) = withContext(Dispatchers.IO) { store.saveHabit(habit) }
