@@ -26,7 +26,6 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     val habit = repo.habitFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val categoryOptions = repo.categoryOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val habitOptions = repo.habitOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val baseUrl = repo.baseUrlFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodoRepository.DEFAULT_TODO_BASE)
     val newTaskText = MutableStateFlow("")
     val dueDateText = MutableStateFlow(java.time.LocalDate.now().toString())
     val isSyncing = MutableStateFlow(false)
@@ -100,10 +99,6 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveHabit(habit.trim())
     }
 
-    fun saveBaseUrl(url: String) = viewModelScope.launch {
-        repo.saveBaseUrl(url.trim())
-    }
-
     fun syncFromApi() = viewModelScope.launch {
         val key = accessKey.value.trim()
         val cat = category.value.trim()
@@ -131,7 +126,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             val pushedResult = repo.pushItems(toPush, key, cat, hab)
             val remote = if (pushedResult.created.isNotEmpty()) repo.fetchFromApi(key) else initialRemote
             val (cats, habits) = repo.fetchMeta(key)
-            val merged = mergeRemoteWithLocal(remote, localBefore, pushedResult.failed)
+            val merged = mergeRemoteWithLocal(remote, localBefore)
             repo.saveTasks(merged)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
@@ -197,11 +192,11 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         lastSyncStatus.value = "Local tasks cleared."
     }
 
-    private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>, failedPushes: List<TodoItem> = emptyList()): List<TodoItem> {
-        // Use remote as source of truth, but keep any local items that failed to push (non-numeric IDs).
+    private fun mergeRemoteWithLocal(remote: List<TodoItem>, local: List<TodoItem>): List<TodoItem> {
+        // Remote is the source of truth; only preserve local completion/due date when IDs match.
         val localMap = local.associateBy { it.id }
 
-        val merged = remote.map { remoteItem ->
+        return remote.map { remoteItem ->
             val localItem = localMap[remoteItem.id]
             if (localItem != null) {
                 remoteItem.copy(
@@ -211,16 +206,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 remoteItem
             }
-        }.toMutableList()
-
-        // Keep failed push items visible so the user knows they didn't sync.
-        failedPushes.forEach { failed ->
-            if (failed.id.isBlank() || failed.id.any { !it.isDigit() }) {
-                merged.add(failed)
-            }
         }
-
-        return merged
     }
 
     private fun httpMessage(e: Throwable, fallback: String): String {

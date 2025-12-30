@@ -3,18 +3,11 @@ package com.punishdave.homeapps
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
 
 class TodoRepository(
-    private val store: ToDoStore
+    private val store: ToDoStore,
+    private val api: TodoApi = Network.todoApi
 ) {
-    companion object {
-        const val DEFAULT_TODO_BASE = "https://apm.d4c.myftpupload.com/index.php/wp-json/pd-todo/v1/"
-    }
-
-    private var cachedBase: String? = null
-    private var cachedApi: TodoApi? = null
 
     data class PushResult(val created: List<TodoItem>, val failed: List<TodoItem>)
 
@@ -24,7 +17,6 @@ class TodoRepository(
     fun habitFlow() = store.habitFlow
     fun categoryOptionsFlow() = store.categoryOptionsFlow
     fun habitOptionsFlow() = store.habitOptionsFlow
-    fun baseUrlFlow() = store.baseUrlFlow
 
     suspend fun saveTasks(tasks: List<TodoItem>) = withContext(Dispatchers.IO) { store.saveTasks(tasks) }
     suspend fun clearTasks() = withContext(Dispatchers.IO) { store.clearTasks() }
@@ -33,11 +25,9 @@ class TodoRepository(
     suspend fun saveHabit(habit: String) = withContext(Dispatchers.IO) { store.saveHabit(habit) }
     suspend fun saveCategoryOptions(categories: List<String>) = withContext(Dispatchers.IO) { store.saveCategoryOptions(categories) }
     suspend fun saveHabitOptions(habits: List<String>) = withContext(Dispatchers.IO) { store.saveHabitOptions(habits) }
-    suspend fun saveBaseUrl(url: String) = withContext(Dispatchers.IO) { store.saveBaseUrl(url) }
 
     suspend fun fetchFromApi(key: String): List<TodoItem> {
         if (key.isBlank()) return emptyList()
-        val api = api()
         return withContext(Dispatchers.IO) {
             val perPage = 100
             val all = mutableListOf<TodoRemoteItem>()
@@ -58,7 +48,6 @@ class TodoRepository(
 
     suspend fun fetchMeta(key: String): Pair<List<String>, List<String>> {
         if (key.isBlank()) return emptyList<String>() to emptyList()
-        val api = api()
         return withContext(Dispatchers.IO) {
             val categories = runCatching { api.listCategories(key = key) }.getOrElse { emptyList() }
             val habits = runCatching { api.listHabits(key = key) }.getOrElse { emptyList() }
@@ -108,7 +97,6 @@ class TodoRepository(
     suspend fun updateStatusRemote(id: String, done: Boolean, key: String): TodoItem? {
         val intId = id.toIntOrNull() ?: return null
         val status = if (done) "done" else "pending"
-        val api = api()
         val remote = withContext(Dispatchers.IO) {
             api.updateItem(
                 id = intId,
@@ -121,7 +109,6 @@ class TodoRepository(
 
     suspend fun deleteRemote(id: String, key: String): Boolean {
         val intId = id.toIntOrNull() ?: return false
-        val api = api()
         return runCatching {
             withContext(Dispatchers.IO) {
                 api.deleteItem(
@@ -134,7 +121,6 @@ class TodoRepository(
 
     suspend fun createRemote(title: String, key: String, category: String, habit: String, dueDate: String): TodoItem? {
         if (title.isBlank()) return null
-        val api = api()
         return withContext(Dispatchers.IO) {
             val remote = api.createItem(
                 key = key,
@@ -156,20 +142,4 @@ class TodoRepository(
         dueDate = due_date
     )
 
-    private suspend fun api(): TodoApi {
-        val base = store.baseUrlFlow.firstOrNull().orEmpty().ifBlank { DEFAULT_TODO_BASE }
-        if (cachedApi == null || cachedBase != base) {
-            cachedApi = Retrofit.Builder()
-                .baseUrl(ensureTrailingSlash(base))
-                .addConverterFactory(MoshiConverterFactory.create(Network.moshi))
-                .client(Network.client)
-                .build()
-                .create(TodoApi::class.java)
-            cachedBase = base
-        }
-        return cachedApi!!
-    }
-
-    private fun ensureTrailingSlash(base: String): String =
-        if (base.endsWith("/")) base else "$base/"
 }

@@ -19,7 +19,6 @@ class ToDoStore(private val context: Context) {
     private val KEY_HABIT = stringPreferencesKey("todo_habit")
     private val KEY_CATEGORY_OPTIONS = stringPreferencesKey("todo_category_options")
     private val KEY_HABIT_OPTIONS = stringPreferencesKey("todo_habit_options")
-    private val KEY_BASE_URL = stringPreferencesKey("todo_base_url")
 
     private val moshi: Moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -45,10 +44,6 @@ class ToDoStore(private val context: Context) {
 
     val habitFlow: Flow<String> = context.todoDataStore.data.map { prefs ->
         prefs[KEY_HABIT] ?: ""
-    }
-
-    val baseUrlFlow: Flow<String> = context.todoDataStore.data.map { prefs ->
-        prefs[KEY_BASE_URL] ?: ""
     }
 
     val categoryOptionsFlow: Flow<List<String>> = context.todoDataStore.data.map { prefs ->
@@ -89,9 +84,5 @@ class ToDoStore(private val context: Context) {
 
     suspend fun saveHabitOptions(habits: List<String>) {
         context.todoDataStore.edit { it[KEY_HABIT_OPTIONS] = stringListAdapter.toJson(habits) }
-    }
-
-    suspend fun saveBaseUrl(url: String) {
-        context.todoDataStore.edit { it[KEY_BASE_URL] = url }
     }
 }
