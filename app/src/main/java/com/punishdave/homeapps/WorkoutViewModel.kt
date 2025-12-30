@@ -46,7 +46,9 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             notes = notesText.value.trim()
         )
 
-        val updated = listOf(newEntry) + entries.value
+        val updated = listOf(newEntry) + entries.value.filterNot {
+            it.workout.equals(w, ignoreCase = true) && it.date == d
+        }
         repo.save(updated)
 
         workoutText.value = ""
@@ -75,12 +77,15 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
 
+        val today = LocalDate.now().toString()
         val newEntry = WorkoutEntry(
-            date = LocalDate.now().toString(),
+            date = today,
             workout = w,
             notes = n
         )
-        val updated = listOf(newEntry) + entries.value
+        val updated = listOf(newEntry) + entries.value.filterNot {
+            it.workout.equals(w, ignoreCase = true) && it.date == today
+        }
         repo.save(updated)
         lastError.value = null
     }
@@ -118,11 +123,17 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     fun pushDay(dayKey: String) = viewModelScope.launch {
         val key = accessKey.value.trim().ifEmpty { null }
         val day = days.value.firstOrNull { it.day_key == dayKey } ?: return@launch
+        if (key == null) {
+            lastError.value = "Enter the workout access key in Settings, then tap Sync/Push."
+            return@launch
+        }
         try {
             repo.pushDay(day, key)
+            lastSyncStatus.value = "Pushed ${day.label}."
             lastError.value = null
         } catch (e: Exception) {
             lastError.value = "Push failed: ${e.message}"
+            lastSyncStatus.value = null
         }
     }
 }

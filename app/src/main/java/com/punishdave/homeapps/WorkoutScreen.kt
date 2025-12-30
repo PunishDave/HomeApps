@@ -160,6 +160,15 @@ private fun WorkoutLogSection(
                 )
             }
         }
+        item {
+            lastSyncStatus?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
 
         item {
             Text(
