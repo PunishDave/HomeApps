@@ -65,6 +65,8 @@ fun WorkoutScreen(
     val lastSync by vm.lastSyncStatus.collectAsState()
     val days by vm.days.collectAsState()
     val selectedDayKey by vm.selectedDayKey.collectAsState()
+    val selectedDayDetail by vm.selectedDayDetail.collectAsState()
+    val latestEntries by vm.latestEntries.collectAsState()
     var currentTab by rememberSaveable { mutableStateOf(WorkoutTab.Log) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = WorkoutBg) {
@@ -122,7 +124,9 @@ fun WorkoutScreen(
                     lastErr = lastErr,
                     days = days,
                     selectedDayKey = selectedDayKey,
-                    lastSyncStatus = lastSync
+                    lastSyncStatus = lastSync,
+                    dayDetail = selectedDayDetail,
+                    latestEntries = latestEntries
                 )
                 WorkoutTab.Settings -> WorkoutSettingsSection(
                     accessKey = accessKey,
@@ -143,9 +147,12 @@ private fun WorkoutLogSection(
     lastErr: String?,
     days: List<WorkoutDay>,
     selectedDayKey: String?,
-    lastSyncStatus: String?
+    lastSyncStatus: String?,
+    dayDetail: WorkoutDay?,
+    latestEntries: List<WorkoutLatestEntry>
 ) {
     val selectedDay = days.firstOrNull { it.day_key == selectedDayKey }
+    val activeDay = dayDetail ?: selectedDay
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -202,20 +209,20 @@ private fun WorkoutLogSection(
 
         item {
             Text(
-                text = selectedDay?.label ?: "Select a day to see workouts",
+                text = activeDay?.label ?: "Select a day to see workouts",
                 color = Color.White,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
         }
-        if (selectedDay != null) {
+        if (activeDay != null) {
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
                     FilledIconButton(
-                        onClick = { vm.pushEntriesForDay(selectedDay.day_key) },
+                        onClick = { vm.pushEntriesForDay(activeDay.day_key) },
                         colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
                             containerColor = WorkoutAccent,
                             contentColor = Color.White
@@ -227,7 +234,7 @@ private fun WorkoutLogSection(
             }
         }
 
-        if (selectedDay == null || selectedDay.workouts.isEmpty()) {
+        if (activeDay == null || activeDay.workouts.isEmpty()) {
             item {
                 Text(
                     text = "No workouts loaded for this day yet. Hit Sync in Settings to fetch days.",
@@ -236,7 +243,8 @@ private fun WorkoutLogSection(
                 )
             }
         } else {
-            items(selectedDay.workouts, key = { it.name }) { move ->
+            items(activeDay.workouts, key = { it.name }) { move ->
+                val latestForMove = latestEntries.firstOrNull { it.workout.equals(move.name, ignoreCase = true) }
                 val history = remember(entries, move.name) {
                     entries.filter { it.workout.equals(move.name, ignoreCase = true) }
                         .sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })
@@ -244,7 +252,8 @@ private fun WorkoutLogSection(
                 WorkoutMoveCard(
                     move = move,
                     history = history,
-                    onAdd = { note -> vm.addEntryForMove(move.name, note) }
+                    latest = latestForMove,
+                    onAdd = { weight -> vm.addEntryForMove(move, weight, activeDay.day_key) }
                 )
             }
         }
@@ -255,9 +264,10 @@ private fun WorkoutLogSection(
 private fun WorkoutMoveCard(
     move: WorkoutMove,
     history: List<WorkoutEntry>,
+    latest: WorkoutLatestEntry?,
     onAdd: (String) -> Unit
 ) {
-    var noteText by rememberSaveable(move.name) { mutableStateOf("") }
+    var weightText by rememberSaveable(move.name) { mutableStateOf("") }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -299,6 +309,18 @@ private fun WorkoutMoveCard(
                 )
             }
 
+            val latestWeight = latest?.weight ?: move.last_weight
+            val latestDate = latest?.performedOn ?: move.last_performed_on
+            if (!latestWeight.isNullOrBlank()) {
+                val dateLabel = latestDate?.let { formatDate(it) }
+                Text(
+                    text = listOfNotNull("Last: $latestWeight", dateLabel).joinToString(" – "),
+                    color = Color(0xFFDFDFDF),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
             Text(
                 text = "History",
                 color = Color.White,
@@ -314,7 +336,7 @@ private fun WorkoutMoveCard(
                             color = Color(0xFFBDBDBD),
                             style = MaterialTheme.typography.bodySmall
                         )
-                        entry.notes.takeIf { it.isNotBlank() }?.let {
+                        entryWeight(entry)?.let {
                             Text(
                                 text = "Weight: $it",
                                 color = Color(0xFFDFDFDF),
@@ -334,8 +356,8 @@ private fun WorkoutMoveCard(
 
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
-                value = noteText,
-                onValueChange = { noteText = it },
+                value = weightText,
+                onValueChange = { weightText = it },
                 singleLine = true,
                 label = { Text("Weight") }
             )
@@ -346,10 +368,10 @@ private fun WorkoutMoveCard(
             ) {
                 FilledIconButton(
                     onClick = {
-                        val trimmed = noteText.trim()
+                        val trimmed = weightText.trim()
                         if (trimmed.isNotEmpty()) {
                             onAdd(trimmed)
-                            noteText = ""
+                            weightText = ""
                         }
                     },
                     colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
@@ -489,9 +511,9 @@ private fun WorkoutRow(
                 }
             }
 
-            if (entry.notes.isNotBlank()) {
+            entryWeight(entry)?.let { w ->
                 Text(
-                    text = "Weight: ${entry.notes}",
+                    text = "Weight: $w",
                     color = Color(0xFFDFDFDF),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
@@ -500,7 +522,7 @@ private fun WorkoutRow(
 
             if (last != null) {
                 val lastLabel = if (last.date == entry.date) "Last logged today" else "Last logged ${formatDate(last.date)}"
-                val lastNotes = last.notes.takeIf { it.isNotBlank() }?.let { "Weight: $it" }
+                val lastNotes = entryWeight(last)?.let { "Weight: $it" }
                 Text(
                     text = listOfNotNull(lastLabel, lastNotes).joinToString(" – "),
                     color = Color(0xFFBDBDBD),
@@ -516,6 +538,10 @@ private fun parseDate(raw: String): LocalDate? = parseFlexibleDate(raw)
 
 private fun formatDate(raw: String): String {
     return formatDateForDisplay(raw) ?: raw
+}
+
+private fun entryWeight(entry: WorkoutEntry): String? {
+    return entry.weight?.takeIf { it.isNotBlank() } ?: entry.notes.takeIf { it.isNotBlank() }
 }
 
 private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEntry> {

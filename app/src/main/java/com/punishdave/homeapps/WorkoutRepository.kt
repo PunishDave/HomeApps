@@ -17,6 +17,38 @@ class WorkoutRepository(private val store: WorkoutStore) {
         store.saveDays(days)
     }
 
+    suspend fun fetchDay(dayKey: String, key: String?): WorkoutDay {
+        val bearer = key?.let { "Bearer $it" }
+        return Network.workoutApi.getDay(
+            dayKey = dayKey,
+            key = key,
+            altHeader = key,
+            bearer = bearer,
+            keyQuery = key,
+            altQuery = key,
+            plainKey = key,
+            accessKey = key,
+            cacheBuster = System.currentTimeMillis()
+        )
+    }
+
+    suspend fun fetchLatest(dayKey: String, key: String?): WorkoutLatestResponse? {
+        val bearer = key?.let { "Bearer $it" }
+        return runCatching {
+            Network.workoutApi.getDayLatest(
+                dayKey = dayKey,
+                key = key,
+                altHeader = key,
+                bearer = bearer,
+                keyQuery = key,
+                altQuery = key,
+                plainKey = key,
+                accessKey = key,
+                cacheBuster = System.currentTimeMillis()
+            )
+        }.getOrNull()
+    }
+
     suspend fun fetchDays(key: String?): List<WorkoutDay> {
         val bearer = key?.let { "Bearer $it" }
         return Network.workoutApi.listDays(
@@ -37,7 +69,13 @@ class WorkoutRepository(private val store: WorkoutStore) {
             label = day.label,
             icon = day.icon,
             sort_order = day.sort_order,
-            workouts = day.workouts
+            workouts = day.workouts.map {
+                WorkoutMove(
+                    name = it.name,
+                    type = it.type,
+                    reps = it.reps
+                )
+            }
         )
         return Network.workoutApi.upsertDay(
             dayKey = day.day_key,
@@ -58,10 +96,11 @@ class WorkoutRepository(private val store: WorkoutStore) {
             entries = entries.map {
                 WorkoutEntryPayload(
                     workout = it.workout,
-                    weight = it.notes.takeIf { notes -> notes.isNotBlank() },
-                    reps = null,
+                    weight = it.weight?.takeIf { w -> w.isNotBlank() } ?: it.notes.takeIf { notes -> notes.isNotBlank() },
+                    reps = it.reps,
                     performed_on = it.date,
-                    notes = null
+                    notes = it.notes.takeIf { notes -> notes.isNotBlank() },
+                    day_key = it.dayKey
                 )
             }
         )

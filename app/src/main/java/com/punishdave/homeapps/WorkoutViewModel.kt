@@ -3,6 +3,7 @@ package com.punishdave.homeapps
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.squareup.moshi.Json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -14,6 +15,9 @@ data class WorkoutEntry(
     val id: String = UUID.randomUUID().toString(),
     val date: String,
     val workout: String,
+    @Json(name = "day_key") val dayKey: String? = null,
+    val weight: String? = null,
+    val reps: Int? = null,
     val notes: String = ""
 )
 
@@ -24,6 +28,8 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val days = repo.daysFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val selectedDayKey = MutableStateFlow<String?>(null)
+    val selectedDayDetail = MutableStateFlow<WorkoutDay?>(null)
+    val latestEntries = MutableStateFlow<List<WorkoutLatestEntry>>(emptyList())
 
     val workoutText = MutableStateFlow("")
     val notesText = MutableStateFlow("")
@@ -34,16 +40,23 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     fun addEntry() = viewModelScope.launch {
         val w = workoutText.value.trim()
         val d = dateText.value.trim().ifEmpty { LocalDate.now().toString() }
+        val weight = notesText.value.trim().ifEmpty { null }
 
         if (w.isEmpty()) {
             lastError.value = "Add a workout name first."
+            return@launch
+        }
+        if (weight.isNullOrEmpty()) {
+            lastError.value = "Add a weight first."
             return@launch
         }
 
         val newEntry = WorkoutEntry(
             date = d,
             workout = w,
-            notes = notesText.value.trim()
+            weight = weight,
+            reps = null,
+            notes = weight
         )
 
         val updated = listOf(newEntry) + entries.value.filterNot {
@@ -54,6 +67,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         workoutText.value = ""
         notesText.value = ""
         dateText.value = LocalDate.now().toString()
+        lastError.value = null
     }
 
     fun deleteEntry(id: String) = viewModelScope.launch {
@@ -65,15 +79,15 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         repo.saveAccessKey(key.trim())
     }
 
-    fun addEntryForMove(moveName: String, notes: String) = viewModelScope.launch {
-        val w = moveName.trim()
-        val n = notes.trim()
+    fun addEntryForMove(move: WorkoutMove, weightText: String, dayKey: String?) = viewModelScope.launch {
+        val w = move.name.trim()
+        val weight = weightText.trim()
         if (w.isEmpty()) {
             lastError.value = "Workout name missing."
             return@launch
         }
-        if (n.isEmpty()) {
-            lastError.value = "Add weight/reps first."
+        if (weight.isEmpty()) {
+            lastError.value = "Add a weight first."
             return@launch
         }
 
@@ -81,7 +95,10 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         val newEntry = WorkoutEntry(
             date = today,
             workout = w,
-            notes = n
+            dayKey = dayKey,
+            weight = weight,
+            reps = move.reps,
+            notes = weight
         )
         val updated = listOf(newEntry) + entries.value.filterNot {
             it.workout.equals(w, ignoreCase = true) && it.date == today
@@ -90,8 +107,9 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         lastError.value = null
     }
 
-    fun selectDay(key: String) {
+    fun selectDay(key: String) = viewModelScope.launch {
         selectedDayKey.value = key
+        loadDayDetail(key)
     }
 
     fun syncFromApi() = viewModelScope.launch {
@@ -105,7 +123,11 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             val fetched = repo.fetchDays(key).sortedBy { it.sort_order ?: Int.MAX_VALUE }
             repo.saveDays(fetched)
             if (selectedDayKey.value == null && fetched.isNotEmpty()) {
-                selectedDayKey.value = fetched.first().day_key
+                val firstKey = fetched.first().day_key
+                selectedDayKey.value = firstKey
+                loadDayDetail(firstKey)
+            } else {
+                selectedDayKey.value?.let { loadDayDetail(it) }
             }
             lastSyncStatus.value = "Synced ${fetched.size} days from server."
             lastError.value = null
@@ -154,12 +176,28 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
         try {
-            repo.pushEntries(filtered, key)
+            val payload = filtered.map { entry ->
+                if (entry.dayKey == null && dayKey != null) entry.copy(dayKey = dayKey) else entry
+            }
+            repo.pushEntries(payload, key)
             lastSyncStatus.value = "Pushed ${filtered.size} entries."
             lastError.value = null
         } catch (e: Exception) {
             lastError.value = "Push failed: ${e.message}"
             lastSyncStatus.value = null
+        }
+    }
+
+    private suspend fun loadDayDetail(dayKey: String) {
+        val key = accessKey.value.trim().ifEmpty { null } ?: return
+        latestEntries.value = emptyList()
+        try {
+            val detail = repo.fetchDay(dayKey, key)
+            selectedDayDetail.value = detail
+            val latest = repo.fetchLatest(dayKey, key)
+            latestEntries.value = latest?.latest.orEmpty()
+        } catch (e: Exception) {
+            lastError.value = "Failed to load day: ${e.message ?: "unknown error"}"
         }
     }
 }
