@@ -251,7 +251,6 @@ private fun WorkoutLogSection(
                 }
                 WorkoutMoveCard(
                     move = move,
-                    history = history,
                     latest = latestForMove,
                     onAdd = { weight -> vm.addEntryForMove(move, weight, activeDay.day_key) }
                 )
@@ -263,7 +262,6 @@ private fun WorkoutLogSection(
 @Composable
 private fun WorkoutMoveCard(
     move: WorkoutMove,
-    history: List<WorkoutEntry>,
     latest: WorkoutLatestEntry?,
     onAdd: (String) -> Unit
 ) {
