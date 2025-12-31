@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
@@ -139,25 +138,21 @@ fun HomeAppsScreen(
     val cards = listOf(
         HomeCard(
             title = "Meal Planner",
-            desc = "Plan the week's meals and your shopping list.",
             icon = { Icon(Icons.Filled.Restaurant, contentDescription = null) },
             onClick = onOpenMealPlanner
         ),
         HomeCard(
             title = "Have We Got",
-            desc = "Check what's available at a glance.",
             icon = { Icon(Icons.Filled.Inventory2, contentDescription = null) },
             onClick = onOpenHaveWeGot
         ),
         HomeCard(
             title = "To-Do",
-            desc = "Track and manage your tasks with categories, habits, and recurrence.",
             icon = { Icon(Icons.Filled.Checklist, contentDescription = null) },
             onClick = onOpenTodo
         ),
         HomeCard(
             title = "Workout Log",
-            desc = "Simple 5-day log to recall your last weight and reps by workout.",
             icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null) },
             onClick = onOpenWorkoutLog
         )
@@ -177,12 +172,6 @@ fun HomeAppsScreen(
                 color = accent,
                 fontSize = 34.sp,
                 fontWeight = FontWeight.ExtraBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Handy home tools in one place. Pick an app to jump straight in.",
-                color = Color(0xFFBDBDBD),
-                fontSize = 14.sp
             )
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -225,7 +214,6 @@ private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color) {
         items(cards) { card ->
             AppCard(
                 title = card.title,
-                desc = card.desc,
                 accent = accent,
                 icon = card.icon,
                 onClick = card.onClick,
@@ -240,7 +228,6 @@ private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color) {
 @Composable
 private fun AppCard(
     title: String,
-    desc: String,
     accent: Color,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
@@ -271,21 +258,12 @@ private fun AppCard(
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
-            Text(
-                text = desc,
-                color = Color(0xFFB0B0B0),
-                fontSize = 13.sp,
-                lineHeight = 18.sp,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
 
 private data class HomeCard(
     val title: String,
-    val desc: String,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit
 )

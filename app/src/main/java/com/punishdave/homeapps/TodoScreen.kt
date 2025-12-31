@@ -56,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -77,6 +78,10 @@ fun TodoScreen(
 ) {
     val vm: TodoViewModel = viewModel()
     val tasks by vm.tasks.collectAsState()
+    val orderedTasks = remember(tasks) {
+        val (open, done) = tasks.partition { !it.done }
+        open + done
+    }
     val newTaskText by vm.newTaskText.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
     val category by vm.category.collectAsState()
@@ -142,7 +147,7 @@ fun TodoScreen(
 
             when (currentTab) {
                 TodoTab.Tasks -> TasksSection(
-                    tasks = tasks,
+                    tasks = orderedTasks,
                     newTaskText = newTaskText,
                     dueDateText = dueDate,
                     listState = listState,
@@ -279,7 +284,7 @@ private fun TasksSection(
                         value = dueDateText,
                         onValueChange = onChangeDueDate,
                         singleLine = true,
-                        label = { Text("Due date (YYYY-MM-DD)") }
+                        label = { Text("Due date (DD-MM-YYYY)") }
                     )
                     FilledIconButton(
                         onClick = onAdd,
@@ -533,6 +538,7 @@ private fun TodoRow(
     onToggle: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val rowAlpha = if (task.done) 0.45f else 1f
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -543,6 +549,7 @@ private fun TodoRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 72.dp)
+                .alpha(rowAlpha)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = LocalIndication.current,
@@ -603,8 +610,5 @@ private fun TodoRow(
 }
 
 private fun shortDate(raw: String): String {
-    val trimmed = raw.trim()
-    val tSplit = trimmed.substringBefore('T', trimmed)
-    val spaceSplit = tSplit.substringBefore(' ', tSplit)
-    return spaceSplit.ifBlank { trimmed }
+    return formatDateForDisplay(raw) ?: raw.trim()
 }

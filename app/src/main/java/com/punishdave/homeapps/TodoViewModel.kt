@@ -27,7 +27,7 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     val categoryOptions = repo.categoryOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val habitOptions = repo.habitOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val newTaskText = MutableStateFlow("")
-    val dueDateText = MutableStateFlow(java.time.LocalDate.now().toString())
+    val dueDateText = MutableStateFlow(todayDisplayDate())
     val isSyncing = MutableStateFlow(false)
     val lastError = MutableStateFlow<String?>(null)
     val lastSyncStatus = MutableStateFlow<String?>(null)
@@ -42,48 +42,54 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
         val key = accessKey.value.trim()
         val cat = category.value.trim()
         val hab = habit.value.trim()
-        val due = dueDateText.value.trim()
+        val dueInput = dueDateText.value.trim()
+        val due = normalizeDateToIso(dueInput)
+
+        if (dueInput.isNotBlank() && due == null) {
+            lastError.value = "Enter the due date as DD-MM-YYYY."
+            return@launch
+        }
 
         if (key.isEmpty()) {
             val updated = listOf(
                 TodoItem(
                     title = title,
-                    dueDate = due.ifEmpty { null }
+                    dueDate = due
                 )
             ) + tasks.value
             repo.saveTasks(updated)
             newTaskText.value = ""
-            dueDateText.value = java.time.LocalDate.now().toString()
+            dueDateText.value = todayDisplayDate()
             return@launch
         }
 
         // Try remote create; fall back to local
         runCatching {
-            val remote = repo.createRemote(title, key, cat, hab, due)
+            val remote = repo.createRemote(title, key, cat, hab, due.orEmpty())
             val merged = if (remote != null) {
                 listOf(remote) + tasks.value
             } else {
                 listOf(
                     TodoItem(
                         title = title,
-                        dueDate = due.ifEmpty { null }
+                        dueDate = due
                     )
                 ) + tasks.value
             }
             repo.saveTasks(merged)
             newTaskText.value = ""
-            dueDateText.value = java.time.LocalDate.now().toString()
+            dueDateText.value = todayDisplayDate()
         }.onFailure { e ->
             lastError.value = e.message ?: "Add failed"
             val updated = listOf(
                 TodoItem(
                     title = title,
-                    dueDate = due.ifEmpty { null }
+                    dueDate = due
                 )
             ) + tasks.value
             repo.saveTasks(updated)
             newTaskText.value = ""
-            dueDateText.value = java.time.LocalDate.now().toString()
+            dueDateText.value = todayDisplayDate()
         }
     }
 

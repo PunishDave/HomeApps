@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 import androidx.compose.foundation.layout.statusBarsPadding
 
@@ -237,8 +236,6 @@ private fun CurrentWeekDayCard(
     date: LocalDate,
     mealTitle: String?
 ) {
-    val headerFmt = DateTimeFormatter.ofPattern("EEE d MMM")
-
     Surface(
         shape = RoundedCornerShape(10.dp),
         color = Color(0xFFEFEFEF),
@@ -253,7 +250,7 @@ private fun CurrentWeekDayCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = date.format(headerFmt),
+                        text = date.toDisplayDate(),
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
@@ -412,7 +409,6 @@ private fun PlanWeekDayCard(
     selectedRecipeId: Int,
     onSelected: (Int) -> Unit
 ) {
-    val headerFmt = DateTimeFormatter.ofPattern("EEE d MMM")
     val headerBg = Color(0xFF3A0000)
     val bodyBg = Color(0xFF333333)
 
@@ -433,7 +429,7 @@ private fun PlanWeekDayCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = date.format(headerFmt),
+                        text = date.toDisplayDate(),
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp

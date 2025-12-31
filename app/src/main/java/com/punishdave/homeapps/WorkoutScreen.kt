@@ -47,12 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 private val WorkoutBg = Color(0xFF1C1C1C)
 private val WorkoutPanel = Color(0xFF0F0F0F)
 private val WorkoutAccent = Color(0xFFB00020)
-private val DateDisplayFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM")
 
 private enum class WorkoutTab { Log, Settings }
 
@@ -465,7 +463,7 @@ private fun WorkoutRow(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = entry.date,
+                        text = formatDate(entry.date),
                         color = Color(0xFFBDBDBD),
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -498,11 +496,10 @@ private fun WorkoutRow(
     }
 }
 
-private fun parseDate(raw: String): LocalDate? = runCatching { LocalDate.parse(raw) }.getOrNull()
+private fun parseDate(raw: String): LocalDate? = parseFlexibleDate(raw)
 
 private fun formatDate(raw: String): String {
-    val parsed = parseDate(raw)
-    return parsed?.format(DateDisplayFmt) ?: raw
+    return formatDateForDisplay(raw) ?: raw
 }
 
 private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEntry> {
