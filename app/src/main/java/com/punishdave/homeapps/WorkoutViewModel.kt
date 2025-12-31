@@ -18,7 +18,8 @@ data class WorkoutEntry(
     @Json(name = "day_key") val dayKey: String? = null,
     val weight: String? = null,
     val reps: Int? = null,
-    val notes: String = ""
+    val notes: String = "",
+    val synced: Boolean = false
 )
 
 class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
@@ -56,7 +57,8 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             workout = w,
             weight = weight,
             reps = null,
-            notes = weight
+            notes = weight,
+            synced = false
         )
 
         val updated = listOf(newEntry) + entries.value.filterNot {
@@ -98,7 +100,8 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             dayKey = dayKey,
             weight = weight,
             reps = move.reps,
-            notes = weight
+            notes = weight,
+            synced = false
         )
         val updated = listOf(newEntry) + entries.value.filterNot {
             it.workout.equals(w, ignoreCase = true) && it.date == today
@@ -171,16 +174,23 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             val dayWorkouts = days.value.firstOrNull { it.day_key == dayKey }?.workouts?.map { it.name.lowercase() }?.toSet()
             if (dayWorkouts.isNullOrEmpty()) entries.value else entries.value.filter { it.workout.lowercase() in dayWorkouts }
         }
-        if (filtered.isEmpty()) {
-            lastError.value = "No entries to push for this day."
+        val unsynced = filtered.filterNot { it.synced }
+        if (unsynced.isEmpty()) {
+            lastError.value = "No new entries to push for this day."
             return@launch
         }
         try {
-            val payload = filtered.map { entry ->
-                if (entry.dayKey == null && dayKey != null) entry.copy(dayKey = dayKey) else entry
+            val payload = unsynced.map { entry ->
+                val withDay = if (entry.dayKey == null && dayKey != null) entry.copy(dayKey = dayKey) else entry
+                withDay.copy(synced = false) // ensure payload doesn't flip flag before saving
             }
             repo.pushEntries(payload, key)
-            lastSyncStatus.value = "Pushed ${filtered.size} entries."
+            // mark pushed entries as synced locally
+            val updated = entries.value.map { entry ->
+                if (payload.any { it.id == entry.id }) entry.copy(synced = true) else entry
+            }
+            repo.save(updated)
+            lastSyncStatus.value = "Pushed ${payload.size} entries."
             lastError.value = null
         } catch (e: Exception) {
             lastError.value = "Push failed: ${e.message}"

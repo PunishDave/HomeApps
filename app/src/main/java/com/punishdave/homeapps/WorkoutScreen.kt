@@ -292,7 +292,7 @@ private fun WorkoutMoveCard(
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
                 )
-                move.reps?.takeIf { it > 0 }?.let { reps ->
+                move.reps?.let { reps ->
                     Text(
                         text = "Reps: $reps",
                         color = WorkoutAccent,
@@ -311,10 +311,17 @@ private fun WorkoutMoveCard(
 
             val latestWeight = latest?.weight ?: move.last_weight
             val latestDate = latest?.performedOn ?: move.last_performed_on
-            if (!latestWeight.isNullOrBlank()) {
+            val latestReps = latest?.reps ?: move.last_reps
+            val lastParts = buildList {
+                if (!latestWeight.isNullOrBlank()) add(latestWeight)
+                latestReps?.let { add("x$it") }
+            }
+            if (lastParts.isNotEmpty() || latestDate != null) {
                 val dateLabel = latestDate?.let { formatDate(it) }
+                val prefix = if (lastParts.isNotEmpty()) "Last: ${lastParts.joinToString(" ")}" else "Last:"
+                val text = listOfNotNull(prefix, dateLabel).joinToString(" – ")
                 Text(
-                    text = listOfNotNull("Last: $latestWeight", dateLabel).joinToString(" – "),
+                    text = text,
                     color = Color(0xFFDFDFDF),
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium
