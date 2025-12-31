@@ -67,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.weight
+import java.time.LocalDate
+import kotlin.math.abs
 
 private val TodoBg = Color(0xFF1C1C1C)
 private val TodoPanel = Color(0xFF0F0F0F)
@@ -80,10 +82,7 @@ fun TodoScreen(
 ) {
     val vm: TodoViewModel = viewModel()
     val tasks by vm.tasks.collectAsState()
-    val orderedTasks = remember(tasks) {
-        val (open, done) = tasks.partition { !it.done }
-        open + done
-    }
+    val orderedTasks = remember(tasks) { orderTasksByDue(tasks) }
     val newTaskText by vm.newTaskText.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
     val category by vm.category.collectAsState()
@@ -589,14 +588,14 @@ private fun TodoRow(
                     )
                     task.dueDate?.takeIf { it.isNotBlank() }?.let { due ->
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = shortDate(due),
-                            color = Color(0xFFBDBDBD),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Text(
+                        text = shortDate(due),
+                        color = dueTextColor(due),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
+            }
                 if (task.done) {
                     Text(
                         text = "Completed",
@@ -615,4 +614,32 @@ private fun TodoRow(
 
 private fun shortDate(raw: String): String {
     return formatDateForDisplay(raw) ?: raw.trim()
+}
+
+private fun dueTextColor(raw: String): Color {
+    val parsed = parseFlexibleDate(raw)
+    val isToday = parsed == LocalDate.now()
+    return if (isToday) TodoAccent else Color(0xFFBDBDBD)
+}
+
+private fun orderTasksByDue(tasks: List<TodoItem>): List<TodoItem> {
+    val today = LocalDate.now()
+    val todayEpoch = today.toEpochDay()
+    val comparator = Comparator<TodoItem> { a, b ->
+        val pa = parseFlexibleDate(a.dueDate)
+        val pb = parseFlexibleDate(b.dueDate)
+
+        val da = pa?.let { abs(it.toEpochDay() - todayEpoch) } ?: Long.MAX_VALUE
+        val db = pb?.let { abs(it.toEpochDay() - todayEpoch) } ?: Long.MAX_VALUE
+        if (da != db) return@Comparator da.compareTo(db)
+
+        val ea = pa?.toEpochDay() ?: Long.MAX_VALUE
+        val eb = pb?.toEpochDay() ?: Long.MAX_VALUE
+        if (ea != eb) return@Comparator ea.compareTo(eb)
+
+        a.title.compareTo(b.title, ignoreCase = true)
+    }
+
+    val (open, done) = tasks.partition { !it.done }
+    return open.sortedWith(comparator) + done.sortedWith(comparator)
 }
