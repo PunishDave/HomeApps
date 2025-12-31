@@ -156,9 +156,15 @@ class TodoRepository(
 
     private fun TodoRemoteItem.toLocal(): TodoItem = TodoItem(
         id = id.toString(),
-        title = title,
+        title = normalizeText(title),
         done = status.equals("done", ignoreCase = true),
         dueDate = due_date
     )
+
+    private fun normalizeText(text: String): String {
+        return text
+            .replace("\\'", "'")
+            .replace("\\\"", "\"")
+    }
 
 }

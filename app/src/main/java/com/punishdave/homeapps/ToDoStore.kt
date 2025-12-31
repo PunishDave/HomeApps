@@ -32,6 +32,7 @@ class ToDoStore(private val context: Context) {
         val raw = prefs[KEY_TASKS]
         if (raw.isNullOrEmpty()) return@map emptyList()
         runCatching { adapter.fromJson(raw) ?: emptyList() }.getOrElse { emptyList() }
+            .map { it.copy(title = normalizeText(it.title)) }
     }
 
     val accessKeyFlow: Flow<String> = context.todoDataStore.data.map { prefs ->
@@ -84,5 +85,11 @@ class ToDoStore(private val context: Context) {
 
     suspend fun saveHabitOptions(habits: List<String>) {
         context.todoDataStore.edit { it[KEY_HABIT_OPTIONS] = stringListAdapter.toJson(habits) }
+    }
+
+    private fun normalizeText(text: String): String {
+        return text
+            .replace("\\'", "'")
+            .replace("\\\"", "\"")
     }
 }
