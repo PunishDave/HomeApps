@@ -59,7 +59,6 @@ fun WorkoutScreen(
     onBack: () -> Unit
 ) {
     val vm: WorkoutViewModel = viewModel()
-    val entries by vm.entries.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
