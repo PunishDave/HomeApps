@@ -637,7 +637,7 @@ private fun TodoRow(
 }
 
 private fun shortDate(raw: String): String {
-    return formatDateForDisplay(raw) ?: raw.trim()
+    return friendlyDateLabel(raw) ?: raw.trim()
 }
 
 private fun showDueDatePicker(context: android.content.Context, current: String, onSelected: (String) -> Unit) {
