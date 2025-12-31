@@ -277,11 +277,12 @@ private fun WorkoutMoveCard(
                 fontWeight = FontWeight.Bold,
                 style = MaterialTheme.typography.titleMedium
             )
-            move.type?.takeIf { it.isNotBlank() }?.let {
+            move.type?.takeIf { it.isNotBlank() }?.let { reps ->
                 Text(
-                    text = it,
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall
+                    text = "Reps: $reps",
+                    color = WorkoutAccent,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
@@ -302,9 +303,10 @@ private fun WorkoutMoveCard(
                         )
                         entry.notes.takeIf { it.isNotBlank() }?.let {
                             Text(
-                                text = it,
+                                text = "Weight: $it",
                                 color = Color(0xFFDFDFDF),
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -322,7 +324,7 @@ private fun WorkoutMoveCard(
                 value = noteText,
                 onValueChange = { noteText = it },
                 singleLine = true,
-                label = { Text("New weight / reps / notes") }
+                label = { Text("Weight") }
             )
 
             Row(
@@ -476,15 +478,16 @@ private fun WorkoutRow(
 
             if (entry.notes.isNotBlank()) {
                 Text(
-                    text = entry.notes,
+                    text = "Weight: ${entry.notes}",
                     color = Color(0xFFDFDFDF),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
                 )
             }
 
             if (last != null) {
                 val lastLabel = if (last.date == entry.date) "Last logged today" else "Last logged ${formatDate(last.date)}"
-                val lastNotes = last.notes.takeIf { it.isNotBlank() }
+                val lastNotes = last.notes.takeIf { it.isNotBlank() }?.let { "Weight: $it" }
                 Text(
                     text = listOfNotNull(lastLabel, lastNotes).joinToString(" – "),
                     color = Color(0xFFBDBDBD),

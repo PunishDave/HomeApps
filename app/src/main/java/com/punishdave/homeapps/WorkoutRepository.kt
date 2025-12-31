@@ -26,7 +26,8 @@ class WorkoutRepository(private val store: WorkoutStore) {
             keyQuery = key,
             altQuery = key,
             plainKey = key,
-            accessKey = key
+            accessKey = key,
+            cacheBuster = System.currentTimeMillis()
         )
     }
 
@@ -60,7 +61,7 @@ class WorkoutRepository(private val store: WorkoutStore) {
                     weight = it.notes.takeIf { notes -> notes.isNotBlank() },
                     reps = null,
                     performed_on = it.date,
-                    notes = it.notes.takeIf { notes -> notes.isNotBlank() }
+                    notes = null
                 )
             }
         )

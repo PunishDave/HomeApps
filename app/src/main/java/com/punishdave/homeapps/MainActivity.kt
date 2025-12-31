@@ -19,6 +19,11 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +35,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 
 private sealed class Route(val id: String) {
     data object Home : Route("home")
@@ -134,6 +143,9 @@ fun HomeAppsScreen(
 
     val bg = Color(0xFF2A2A2A)
     val accent = Color(0xFFB00020)
+    var syncingAll by rememberSaveable { mutableStateOf(false) }
+    var syncAllMsg by rememberSaveable { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     val cards = listOf(
         HomeCard(
@@ -178,21 +190,59 @@ fun HomeAppsScreen(
 
             FilledTonalButton(
                 onClick = {
-                    mealVm.sync()
-                    haveVm.refresh()
-                    // Only sync To-Do if an access key exists; otherwise keep local tasks
-                    if (todoVm.accessKey.value.isNotBlank()) {
-                        todoVm.syncFromApi()
+                    if (syncingAll) return@FilledTonalButton
+                    syncingAll = true
+                    syncAllMsg = "Syncing all apps..."
+                    scope.launch {
+                        try {
+                            val jobs = mutableListOf<Job>()
+                            jobs += mealVm.sync()
+                            jobs += haveVm.refresh()
+                            if (todoVm.accessKey.value.isNotBlank()) {
+                                jobs += todoVm.syncFromApi()
+                            }
+                            jobs.joinAll()
+                            syncAllMsg = "Sync complete."
+                        } catch (_: Exception) {
+                            syncAllMsg = "Sync started; check individual apps for status."
+                        } finally {
+                            delay(1200)
+                            syncingAll = false
+                        }
                     }
                 },
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = accent.copy(alpha = 0.6f),
                     contentColor = Color.White
-                )
+                ),
+                enabled = !syncingAll
             ) {
                 Icon(Icons.Filled.Sync, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Sync All")
+                Text(if (syncingAll) "Syncing..." else "Sync All")
+            }
+
+            syncAllMsg?.let { msg ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (syncingAll) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .padding(end = 8.dp),
+                            color = accent,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    Text(
+                        text = msg,
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 13.sp
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

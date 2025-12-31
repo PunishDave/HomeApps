@@ -17,7 +17,8 @@ interface WorkoutApi {
         @Query("pd_swl_key") keyQuery: String? = key,
         @Query("pdswl_key") altQuery: String? = key,
         @Query("key") plainKey: String? = key,
-        @Query("access_key") accessKey: String? = key
+        @Query("access_key") accessKey: String? = key,
+        @Query("_ts") cacheBuster: Long? = null
     ): List<WorkoutDay>
 
     @POST("days/{dayKey}")
