@@ -292,7 +292,7 @@ private fun WorkoutMoveCard(
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
                 )
-                move.reps?.let { reps ->
+                displayReps(move)?.let { reps ->
                     Text(
                         text = "Reps: $reps",
                         color = WorkoutAccent,
@@ -549,6 +549,10 @@ private fun formatDate(raw: String): String {
 
 private fun entryWeight(entry: WorkoutEntry): String? {
     return entry.weight?.takeIf { it.isNotBlank() } ?: entry.notes.takeIf { it.isNotBlank() }
+}
+
+private fun displayReps(move: WorkoutMove): Int? {
+    return move.reps?.takeIf { it > 0 } ?: move.last_reps?.takeIf { it > 0 }
 }
 
 private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEntry> {
