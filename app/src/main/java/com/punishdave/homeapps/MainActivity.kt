@@ -138,22 +138,22 @@ fun HomeAppsScreen(
     val cards = listOf(
         HomeCard(
             title = "Meal Planner",
-            icon = { Icon(Icons.Filled.Restaurant, contentDescription = null) },
+            icon = { Icon(Icons.Filled.Restaurant, contentDescription = null, modifier = Modifier.size(44.dp)) },
             onClick = onOpenMealPlanner
         ),
         HomeCard(
             title = "Have We Got",
-            icon = { Icon(Icons.Filled.Inventory2, contentDescription = null) },
+            icon = { Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(44.dp)) },
             onClick = onOpenHaveWeGot
         ),
         HomeCard(
             title = "To-Do",
-            icon = { Icon(Icons.Filled.Checklist, contentDescription = null) },
+            icon = { Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(44.dp)) },
             onClick = onOpenTodo
         ),
         HomeCard(
             title = "Workout Log",
-            icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null) },
+            icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null, modifier = Modifier.size(44.dp)) },
             onClick = onOpenWorkoutLog
         )
     )
@@ -247,7 +247,8 @@ private fun AppCard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             CompositionLocalProvider(LocalContentColor provides accent) {
                 icon()
@@ -256,7 +257,8 @@ private fun AppCard(
                 text = title,
                 color = Color.White,
                 fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
