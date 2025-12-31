@@ -292,7 +292,7 @@ private fun WorkoutMoveCard(
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
                 )
-                displayReps(move)?.let { reps ->
+                displayReps(move, latest)?.let { reps ->
                     Text(
                         text = "Reps: $reps",
                         color = WorkoutAccent,
@@ -328,34 +328,9 @@ private fun WorkoutMoveCard(
                 )
             }
 
-            Text(
-                text = "History",
-                color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            if (history.isNotEmpty()) {
-                history.take(4).forEach { entry ->
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = formatDate(entry.date),
-                            color = Color(0xFFBDBDBD),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        entryWeight(entry)?.let {
-                            Text(
-                                text = "Weight: $it",
-                                color = Color(0xFFDFDFDF),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            } else {
+            if (lastParts.isEmpty() && latestDate == null) {
                 Text(
-                    text = "No history yet. Add an entry below to start tracking.",
+                    text = "No previous entry yet. Add a weight to get started.",
                     color = Color(0xFF9E9E9E),
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -551,8 +526,10 @@ private fun entryWeight(entry: WorkoutEntry): String? {
     return entry.weight?.takeIf { it.isNotBlank() } ?: entry.notes.takeIf { it.isNotBlank() }
 }
 
-private fun displayReps(move: WorkoutMove): Int? {
-    return move.reps?.takeIf { it > 0 } ?: move.last_reps?.takeIf { it > 0 }
+private fun displayReps(move: WorkoutMove, latest: WorkoutLatestEntry?): Int? {
+    return move.reps?.takeIf { it > 0 }
+        ?: latest?.reps?.takeIf { it > 0 }
+        ?: move.last_reps?.takeIf { it > 0 }
 }
 
 private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEntry> {
