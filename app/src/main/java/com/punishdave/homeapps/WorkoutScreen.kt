@@ -341,7 +341,10 @@ private fun WorkoutMoveCard(
                 value = weightText,
                 onValueChange = { weightText = it },
                 singleLine = true,
-                label = { Text("Weight") }
+                label = {
+                    val isTime = move.type.equals("time", ignoreCase = true)
+                    Text(if (isTime) "Time (e.g., 01:00)" else "Weight")
+                }
             )
 
             Row(
