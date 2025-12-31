@@ -82,5 +82,6 @@ data class WorkoutDay(
 @JsonClass(generateAdapter = true)
 data class WorkoutMove(
     val name: String,
-    val type: String? = null
+    val type: String? = null,
+    val reps: Int? = null
 )

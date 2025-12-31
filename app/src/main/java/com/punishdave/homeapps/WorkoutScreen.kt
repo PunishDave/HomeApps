@@ -271,18 +271,31 @@ private fun WorkoutMoveCard(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = move.name,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium
-            )
-            move.type?.takeIf { it.isNotBlank() }?.let { reps ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Reps: $reps",
-                    color = WorkoutAccent,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold
+                    text = move.name,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                move.reps?.takeIf { it > 0 }?.let { reps ->
+                    Text(
+                        text = "Reps: $reps",
+                        color = WorkoutAccent,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            move.type?.takeIf { it.isNotBlank() }?.let { type ->
+                Text(
+                    text = type,
+                    color = Color(0xFFBDBDBD),
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
 
