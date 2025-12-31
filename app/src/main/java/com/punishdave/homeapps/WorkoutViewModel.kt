@@ -193,6 +193,9 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
                 if (payload.any { it.id == entry.id }) entry.copy(synced = true) else entry
             }
             repo.save(updated)
+            if (dayKey != null) {
+                loadDayDetail(dayKey)
+            }
             lastSyncStatus.value = "Pushed ${payload.size} entries."
             lastError.value = null
         } catch (e: Exception) {
