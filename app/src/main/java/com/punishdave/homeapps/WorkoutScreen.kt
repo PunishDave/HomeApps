@@ -120,7 +120,6 @@ fun WorkoutScreen(
             when (currentTab) {
                 WorkoutTab.Log -> WorkoutLogSection(
                     vm = vm,
-                    entries = entries,
                     lastErr = lastErr,
                     days = days,
                     selectedDayKey = selectedDayKey,
@@ -143,7 +142,6 @@ fun WorkoutScreen(
 @Composable
 private fun WorkoutLogSection(
     vm: WorkoutViewModel,
-    entries: List<WorkoutEntry>,
     lastErr: String?,
     days: List<WorkoutDay>,
     selectedDayKey: String?,
@@ -527,18 +525,6 @@ private fun displayReps(move: WorkoutMove, latest: WorkoutLatestEntry?): Int? {
     return move.reps?.takeIf { it > 0 }
         ?: latest?.reps?.takeIf { it > 0 }
         ?: move.last_reps?.takeIf { it > 0 }
-}
-
-private fun lastLogByWorkout(entries: List<WorkoutEntry>): Map<String, WorkoutEntry> {
-    val sorted = entries.sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })
-    val map = mutableMapOf<String, WorkoutEntry>()
-    for (e in sorted) {
-        val key = e.workout.trim().lowercase()
-        if (key.isNotEmpty() && key !in map) {
-            map[key] = e
-        }
-    }
-    return map
 }
 
 @Composable
