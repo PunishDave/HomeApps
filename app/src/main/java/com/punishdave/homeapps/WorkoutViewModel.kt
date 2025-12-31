@@ -180,9 +180,12 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             return@launch
         }
         try {
+            val dayConfig = days.value.firstOrNull { it.day_key == dayKey }
             val payload = unsynced.map { entry ->
-                val withDay = if (entry.dayKey == null && dayKey != null) entry.copy(dayKey = dayKey) else entry
-                withDay.copy(synced = false) // ensure payload doesn't flip flag before saving
+                val targetDayKey = entry.dayKey ?: dayKey
+                val reps = entry.reps ?: dayConfig?.workouts?.firstOrNull { it.name.equals(entry.workout, ignoreCase = true) }?.reps
+                val withDay = entry.copy(dayKey = targetDayKey, reps = reps)
+                withDay.copy(synced = false)
             }
             repo.pushEntries(payload, key)
             // mark pushed entries as synced locally
