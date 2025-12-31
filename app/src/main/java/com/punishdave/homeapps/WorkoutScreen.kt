@@ -245,10 +245,6 @@ private fun WorkoutLogSection(
         } else {
             items(activeDay.workouts, key = { it.name }) { move ->
                 val latestForMove = latestEntries.firstOrNull { it.workout.equals(move.name, ignoreCase = true) }
-                val history = remember(entries, move.name) {
-                    entries.filter { it.workout.equals(move.name, ignoreCase = true) }
-                        .sortedWith(compareByDescending<WorkoutEntry> { parseDate(it.date) ?: LocalDate.MIN })
-                }
                 WorkoutMoveCard(
                     move = move,
                     latest = latestForMove,
