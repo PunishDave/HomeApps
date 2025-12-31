@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.EmojiPeople
 import androidx.compose.material.icons.filled.Settings
@@ -57,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
@@ -67,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.weight
+import android.app.DatePickerDialog
 import java.time.LocalDate
 import kotlin.math.abs
 
@@ -95,6 +98,14 @@ fun TodoScreen(
     val lastSync by vm.lastSyncStatus.collectAsState()
     var currentTab by rememberSaveable { mutableStateOf(TodoTab.Tasks) }
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val showDatePicker = remember(context, dueDate) {
+        {
+            showDueDatePicker(context, dueDate) { picked ->
+                vm.dueDateText.value = picked
+            }
+        }
+    }
 
     Surface(modifier = Modifier.fillMaxSize(), color = TodoBg) {
         Column(
@@ -154,6 +165,7 @@ fun TodoScreen(
                     listState = listState,
                     onChangeNewTask = { vm.newTaskText.value = it },
                     onChangeDueDate = { vm.dueDateText.value = it },
+                    onPickDueDate = showDatePicker,
                     onAdd = { vm.addTask() },
                     onToggle = { vm.toggleTask(it) },
                     onDelete = { vm.deleteTask(it) }
@@ -244,6 +256,7 @@ private fun TasksSection(
     listState: androidx.compose.foundation.lazy.LazyListState,
     onChangeNewTask: (String) -> Unit,
     onChangeDueDate: (String) -> Unit,
+    onPickDueDate: () -> Unit,
     onAdd: () -> Unit,
     onToggle: (String) -> Unit,
     onDelete: (String) -> Unit
@@ -283,11 +296,22 @@ private fun TasksSection(
                         label = { Text("Task name") }
                     )
                     OutlinedTextField(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { onPickDueDate() },
                         value = dueDateText,
                         onValueChange = onChangeDueDate,
                         singleLine = true,
-                        label = { Text("Due date (DD-MM-YYYY)") }
+                        readOnly = true,
+                        label = { Text("Due date") },
+                        trailingIcon = {
+                            IconButton(onClick = onPickDueDate) {
+                                Icon(Icons.Filled.DateRange, contentDescription = "Pick due date")
+                            }
+                        }
                     )
                     FilledIconButton(
                         onClick = onAdd,
@@ -614,6 +638,21 @@ private fun TodoRow(
 
 private fun shortDate(raw: String): String {
     return formatDateForDisplay(raw) ?: raw.trim()
+}
+
+private fun showDueDatePicker(context: android.content.Context, current: String, onSelected: (String) -> Unit) {
+    val initial = parseFlexibleDate(current) ?: LocalDate.now()
+    val dialog = DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val picked = LocalDate.of(year, month + 1, dayOfMonth)
+            onSelected(picked.toDisplayDate())
+        },
+        initial.year,
+        initial.monthValue - 1,
+        initial.dayOfMonth
+    )
+    dialog.show()
 }
 
 private fun dueTextColor(raw: String): Color {
