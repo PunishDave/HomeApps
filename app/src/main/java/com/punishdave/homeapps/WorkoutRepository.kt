@@ -92,18 +92,16 @@ class WorkoutRepository(private val store: WorkoutStore) {
 
     suspend fun pushEntries(entries: List<WorkoutEntry>, key: String?) {
         val bearer = key?.let { "Bearer $it" }
-        val payload = WorkoutEntriesPush(
-            entries = entries.map {
-                WorkoutEntryPayload(
-                    workout = it.workout,
-                    weight = it.weight?.takeIf { w -> w.isNotBlank() } ?: it.notes.takeIf { notes -> notes.isNotBlank() },
-                    reps = it.reps,
-                    performed_on = it.date,
-                    notes = it.notes.takeIf { notes -> notes.isNotBlank() },
-                    day_key = it.dayKey
-                )
-            }
-        )
+        val payload = entries.map {
+            WorkoutEntryPayload(
+                workout = it.workout,
+                weight = it.weight?.takeIf { w -> w.isNotBlank() } ?: it.notes.takeIf { notes -> notes.isNotBlank() },
+                reps = it.reps,
+                performed_on = it.date,
+                notes = it.notes.takeIf { notes -> notes.isNotBlank() },
+                day_key = it.dayKey
+            )
+        }
         Network.workoutApi.pushEntries(
             key = key,
             altHeader = key,

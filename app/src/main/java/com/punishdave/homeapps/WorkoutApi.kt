@@ -70,7 +70,7 @@ interface WorkoutApi {
         @Query("pdswl_key") altQuery: String? = key,
         @Query("key") plainKey: String? = key,
         @Query("access_key") accessKey: String? = key,
-        @Body body: WorkoutEntriesPush
+        @Body body: List<WorkoutEntryPayload>
     )
 }
 
@@ -80,11 +80,6 @@ data class WorkoutDayPost(
     val icon: String? = null,
     val sort_order: Int? = null,
     val workouts: List<WorkoutMove>
-)
-
-@JsonClass(generateAdapter = true)
-data class WorkoutEntriesPush(
-    val entries: List<WorkoutEntryPayload>
 )
 
 @JsonClass(generateAdapter = true)
