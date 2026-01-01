@@ -5,16 +5,26 @@ import retrofit2.http.*
 
 interface MealPlannerApi {
     @GET("weeks")
-    suspend fun getWeek(@Query("week_start") weekStart: String): WeekResponse
+    suspend fun getWeek(
+        @Query("week_start") weekStart: String,
+        @Query("_ts") cacheBuster: Long? = null
+    ): WeekResponse
 
     @GET("random-week")
-    suspend fun getRandomWeek(): List<Recipe>
+    suspend fun getRandomWeek(
+        @Query("_ts") cacheBuster: Long? = null
+    ): List<Recipe>
 
     @POST("weeks")
-    suspend fun postWeek(@Body body: WeekPostRequest): WeekResponse
+    suspend fun postWeek(
+        @Body body: WeekPostRequest,
+        @Query("_ts") cacheBuster: Long? = null
+    ): WeekResponse
 
     @GET("recipes")
-    suspend fun getRecipes(): List<Recipe>
+    suspend fun getRecipes(
+        @Query("_ts") cacheBuster: Long? = null
+    ): List<Recipe>
 }
 
 @JsonClass(generateAdapter = true)

@@ -22,14 +22,15 @@ class MealPlannerRepository(
     }
 
     suspend fun sync() {
+        val ts = System.currentTimeMillis()
         // Always try recipes first
-        val recipes = api.getRecipes()
+        val recipes = api.getRecipes(ts)
         store.saveRecipes(recipes)
 
         // Then try current week, but 404 is "no data" not "sync failed"
         val weekStart = computeWeekStartIso()
         try {
-            val week = api.getWeek(weekStart)
+            val week = api.getWeek(weekStart, ts)
             store.saveCurrentWeek(week)
         } catch (e: HttpException) {
             if (e.code() == 404) {
@@ -44,8 +45,9 @@ class MealPlannerRepository(
     }
 
     suspend fun generateRandomWeek() {
+        val ts = System.currentTimeMillis()
         // Backend returns a bare list of recipes; wrap it into a WeekResponse the app expects.
-        val recipes = api.getRandomWeek()
+        val recipes = api.getRandomWeek(ts)
         if (recipes.isEmpty()) throw IllegalStateException("No recipes available to generate a week.")
 
         // Align with UI: plan for the upcoming week starting Saturday.
@@ -62,6 +64,7 @@ class MealPlannerRepository(
     }
 
     suspend fun savePlannedWeekToServer(week: WeekResponse) {
+        val ts = System.currentTimeMillis()
         // Convert [Recipe, Recipe, ...] to {"0": Recipe, "1": Recipe, ...}
         val mealsMap: Map<String, Recipe> =
             week.meals.mapIndexed { index, recipe -> index.toString() to recipe }.toMap()
@@ -71,7 +74,7 @@ class MealPlannerRepository(
             meals = mealsMap
         )
 
-        val saved = api.postWeek(body)
+        val saved = api.postWeek(body, ts)
 
         // Only mirror to current-week cache if it matches the "current" start
         if (week.week_start == computeWeekStartIso()) {
