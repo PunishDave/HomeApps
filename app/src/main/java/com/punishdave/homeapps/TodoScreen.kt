@@ -347,8 +347,7 @@ private fun TasksSection(
                 contentPadding = PaddingValues(bottom = 96.dp)
             ) {
                 items(
-                    items = tasks,
-                    key = { it.id }
+                    items = tasks
                 ) { task ->
                     TodoRow(
                         task = task,
