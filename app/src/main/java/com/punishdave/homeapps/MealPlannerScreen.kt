@@ -20,17 +20,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.statusBarsPadding
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
-import androidx.compose.foundation.layout.statusBarsPadding
 
 private val Bg = Color(0xFF2A2A2A)
 private val Accent = Color(0xFFB00020)
 private val PanelBg = Color(0xFF0F0F0F)
 
-private fun startOfWeekSaturday(date: LocalDate): LocalDate =
-    date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SATURDAY))
+private fun startOfWeek(date: LocalDate, startDay: DayOfWeek): LocalDate =
+    date.with(TemporalAdjusters.previousOrSame(startDay))
 
 /* -----------------------
    Screen 1: Menu
@@ -192,8 +192,9 @@ fun MealPlannerCurrentWeekScreen(
 ) {
     val vm: MealPlannerViewModel = viewModel()
     val currentWeek = vm.currentWeek.collectAsState().value
+    val startDay = currentWeek?.week_start?.let { LocalDate.parse(it).dayOfWeek } ?: DayOfWeek.SATURDAY
 
-    val start = startOfWeekSaturday(LocalDate.now())
+    val start = startOfWeek(LocalDate.now(), startDay)
     val days = remember(start) { (0..6).map { start.plusDays(it.toLong()) } }
 
     Surface(modifier = Modifier.fillMaxSize(), color = Bg) {
@@ -300,8 +301,12 @@ fun MealPlannerPlanWeekScreen(
     val vm: MealPlannerViewModel = viewModel()
     val recipes = vm.recipes.collectAsState().value
     val plannedWeek = vm.plannedWeek.collectAsState().value
+    val currentWeek = vm.currentWeek.collectAsState().value
+    val startDay = plannedWeek?.week_start?.let { LocalDate.parse(it).dayOfWeek }
+        ?: currentWeek?.week_start?.let { LocalDate.parse(it).dayOfWeek }
+        ?: DayOfWeek.SATURDAY
 
-    val start = startOfWeekSaturday(LocalDate.now()).plusDays(7)
+    val start = startOfWeek(LocalDate.now(), startDay).plusDays(7)
     val days = remember(start) { (0..6).map { start.plusDays(it.toLong()) } }
 
     // Dropdown options come from recipes (plus a default)

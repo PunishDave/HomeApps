@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
+import java.time.LocalDate
 
 class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = MealPlannerRepository(MealPlannerStore(app.applicationContext))
@@ -45,7 +47,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun generateWeek() = viewModelScope.launch {
         try {
-            repo.generateRandomWeek()
+            repo.generateRandomWeek(currentStartDay())
         } catch (e: Exception) {
             lastError.value = e.message ?: "Generate failed"
         }
@@ -58,5 +60,11 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             lastError.value = e.message ?: "Save failed"
         }
+    }
+
+    private fun currentStartDay(): DayOfWeek {
+        plannedWeek.value?.week_start?.let { return LocalDate.parse(it).dayOfWeek }
+        currentWeek.value?.week_start?.let { return LocalDate.parse(it).dayOfWeek }
+        return DayOfWeek.SATURDAY
     }
 }
