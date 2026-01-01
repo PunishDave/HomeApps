@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.squareup.moshi.Json
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -37,6 +38,19 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     val dateText = MutableStateFlow(LocalDate.now().toString())
     val lastError = MutableStateFlow<String?>(null)
     val lastSyncStatus = MutableStateFlow<String?>(null)
+
+    init {
+        viewModelScope.launch {
+            repo.daysFlow().collect { stored ->
+                if (stored.isNotEmpty() && selectedDayKey.value == null) {
+                    selectedDayKey.value = stored.first().day_key
+                }
+                selectedDayKey.value?.let { key ->
+                    stored.firstOrNull { it.day_key == key }?.let { selectedDayDetail.value = it }
+                }
+            }
+        }
+    }
 
     fun addEntry() = viewModelScope.launch {
         val w = workoutText.value.trim()
@@ -112,7 +126,8 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectDay(key: String) = viewModelScope.launch {
         selectedDayKey.value = key
-        loadDayDetail(key)
+        days.value.firstOrNull { it.day_key == key }?.let { selectedDayDetail.value = it }
+        refreshDayDetail(key)
     }
 
     fun syncFromApi() = viewModelScope.launch {
@@ -128,10 +143,8 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             if (selectedDayKey.value == null && fetched.isNotEmpty()) {
                 val firstKey = fetched.first().day_key
                 selectedDayKey.value = firstKey
-                loadDayDetail(firstKey)
-            } else {
-                selectedDayKey.value?.let { loadDayDetail(it) }
             }
+            selectedDayKey.value?.let { refreshDayDetail(it) }
             lastSyncStatus.value = "Synced ${fetched.size} days from server."
             lastError.value = null
         } catch (e: retrofit2.HttpException) {
@@ -194,7 +207,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
             }
             repo.save(updated)
             if (dayKey != null) {
-                loadDayDetail(dayKey)
+                refreshDayDetail(dayKey)
             }
             lastSyncStatus.value = "Pushed ${payload.size} entries."
             lastError.value = null
@@ -204,16 +217,30 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun loadDayDetail(dayKey: String) {
+    private suspend fun refreshDayDetail(dayKey: String) {
         val key = accessKey.value.trim().ifEmpty { null } ?: return
         latestEntries.value = emptyList()
         try {
             val detail = repo.fetchDay(dayKey, key)
             selectedDayDetail.value = detail
+            persistDayDetail(detail)
             val latest = repo.fetchLatest(dayKey, key)
             latestEntries.value = latest?.latest.orEmpty()
         } catch (e: Exception) {
-            lastError.value = "Failed to load day: ${e.message ?: "unknown error"}"
+            if (selectedDayDetail.value == null) {
+                lastError.value = "Failed to load day: ${e.message ?: "unknown error"}"
+            }
         }
+    }
+
+    private suspend fun persistDayDetail(detail: WorkoutDay) {
+        val merged = days.value.toMutableList()
+        val idx = merged.indexOfFirst { it.day_key == detail.day_key }
+        if (idx >= 0) {
+            merged[idx] = detail
+        } else {
+            merged.add(detail)
+        }
+        repo.saveDays(merged)
     }
 }
