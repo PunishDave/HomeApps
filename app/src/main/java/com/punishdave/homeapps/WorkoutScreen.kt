@@ -205,19 +205,18 @@ private fun WorkoutLogSection(
         }
 
         item {
-            Text(
-                text = activeDay?.label ?: "Select a day to see workouts",
-                color = Color.White,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-        if (activeDay != null) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = activeDay?.label ?: "Select a day to see workouts",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (activeDay != null) {
                     FilledIconButton(
                         onClick = { vm.pushEntriesForDay(activeDay.day_key) },
                         colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
