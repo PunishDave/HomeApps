@@ -33,7 +33,16 @@ class MealPlannerRepository(
         val recipes = api.getRecipes(ts)
         store.saveRecipes(recipes)
 
-        fetchCurrentWeek(ts)
+        val today = LocalDate.now()
+        val currentFetched = fetchWeekForCandidates(today, ts) { store.saveCurrentWeek(it) }
+        if (!currentFetched) {
+            store.clearCurrentWeek()
+        }
+
+        val plannedFetched = fetchWeekForCandidates(today.plusDays(7), ts) { store.savePlannedWeek(it) }
+        if (!plannedFetched) {
+            store.clearPlannedWeek()
+        }
     }
 
     suspend fun generateRandomWeek(startDay: DayOfWeek = DayOfWeek.SATURDAY) {
@@ -75,18 +84,21 @@ class MealPlannerRepository(
         }
     }
 
-    private suspend fun fetchCurrentWeek(ts: Long): WeekResponse? {
-        val today = LocalDate.now()
+    private suspend fun fetchWeekForCandidates(
+        targetDate: LocalDate,
+        ts: Long,
+        onFound: suspend (WeekResponse) -> Unit
+    ): Boolean {
         for (startDay in weekStartCandidates) {
-            val weekStart = computeWeekStartIso(today, startDay)
+            val weekStart = computeWeekStartIso(targetDate, startDay)
             try {
                 val week = api.getWeek(weekStart, ts)
-                store.saveCurrentWeek(week)
-                return week
+                onFound(week)
+                return true
             } catch (e: HttpException) {
                 if (e.code() == 404) continue else throw e
             }
         }
-        return null
+        return false
     }
 }

@@ -373,11 +373,12 @@ fun MealPlannerPlanWeekScreen(
                         vm.savePlannedWeekLocal(week)
                         onSave()
                     },
+                    enabled = plannedWeek?.id == null,
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = Accent.copy(alpha = 0.55f),
                         contentColor = Color.White
                     )
-                ) { Text("Save Week") }
+                ) { Text(if (plannedWeek?.id != null) "Already Saved" else "Save Week") }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

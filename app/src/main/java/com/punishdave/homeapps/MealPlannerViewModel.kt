@@ -54,6 +54,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveWeek() = viewModelScope.launch {
+        if (plannedWeek.value?.id != null) return@launch
         val week = plannedWeek.value ?: return@launch
         try {
             repo.savePlannedWeekToServer(week)
