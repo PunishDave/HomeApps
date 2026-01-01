@@ -22,29 +22,29 @@ object Network {
         .build()
 
     val api: MealPlannerApi = Retrofit.Builder()
-        .baseUrl("https://apm.d4c.myftpupload.com/index.php/wp-json/meal-planner/v1/")
+        .baseUrl("https://punishdave.com/index.php/wp-json/meal-planner/v1/")
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .client(client)
         .build()
         .create(MealPlannerApi::class.java)
 
     val haveWeGotApi: HaveWeGotApi = Retrofit.Builder()
-        .baseUrl("https://apm.d4c.myftpupload.com/index.php/wp-json/have-we-got/v1/")
+        .baseUrl("https://punishdave.com/index.php/wp-json/have-we-got/v1/")
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .client(client)
         .build()
         .create(HaveWeGotApi::class.java)
 
     val todoApi: TodoApi = Retrofit.Builder()
-        .baseUrl("https://apm.d4c.myftpupload.com/index.php/wp-json/pd-todo/v1/")
+        .baseUrl("https://punishdave.com/index.php/wp-json/pd-todo/v1/")
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .client(client)
         .build()
         .create(TodoApi::class.java)
-    const val TODO_BASE = "https://apm.d4c.myftpupload.com/index.php/wp-json/pd-todo/v1/"
+    const val TODO_BASE = "https://punishdave.com/index.php/wp-json/pd-todo/v1/"
 
     val workoutApi: WorkoutApi = Retrofit.Builder()
-        .baseUrl("https://apm.d4c.myftpupload.com/index.php/wp-json/pdswl/v1/")
+        .baseUrl("https://punishdave.com/index.php/wp-json/pdswl/v1/")
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .client(client)
         .build()
