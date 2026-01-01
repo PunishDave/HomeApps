@@ -23,7 +23,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.statusBarsPadding
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
+import java.util.Locale
 
 private val Bg = Color(0xFF2A2A2A)
 private val Accent = Color(0xFFB00020)
@@ -251,7 +253,7 @@ private fun CurrentWeekDayCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = date.toDisplayDate(),
+                        text = "${date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())} • ${date.toDisplayDate()}",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
@@ -435,7 +437,7 @@ private fun PlanWeekDayCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = date.toDisplayDate(),
+                        text = "${date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())} • ${date.toDisplayDate()}",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
