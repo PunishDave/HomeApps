@@ -46,6 +46,7 @@ private sealed class Route(val id: String) {
     data object MealPlannerMenu : Route("meal_planner_menu")
     data object MealPlannerCurrent : Route("meal_planner_current")
     data object MealPlannerPlan : Route("meal_planner_plan")
+    data object MealPlannerShoppingList : Route("meal_planner_shopping_list")
 
     data object HaveWeGot : Route("have_we_got")
     data object Todo : Route("todo")
@@ -78,6 +79,7 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() },
                             onOpenCurrentWeek = { navController.navigate(Route.MealPlannerCurrent.id) },
                             onOpenPlanWeek = { navController.navigate(Route.MealPlannerPlan.id) },
+                            onOpenShoppingList = { navController.navigate(Route.MealPlannerShoppingList.id) },
                             onSync = { /* handled inside screen */ }
                         )
                     }
@@ -93,6 +95,12 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() },
                             onGenerate = {},
                             onSave = {}
+                        )
+                    }
+
+                    composable(Route.MealPlannerShoppingList.id) {
+                        MealPlannerShoppingListScreen(
+                            onBack = { navController.popBackStack() }
                         )
                     }
 

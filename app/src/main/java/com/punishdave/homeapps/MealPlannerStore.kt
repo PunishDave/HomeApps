@@ -13,6 +13,8 @@ class MealPlannerStore(private val context: Context) {
     private val KEY_RECIPES = stringPreferencesKey("recipes_json")
     private val KEY_CURRENT_WEEK = stringPreferencesKey("current_week_json")
     private val KEY_PLANNED_WEEK = stringPreferencesKey("planned_week_json")
+    private val KEY_SHOPPING_LIST = stringPreferencesKey("shopping_list_json")
+    private val KEY_ACCESS_KEY = stringPreferencesKey("meal_planner_access_key")
 
     val recipesFlow: Flow<List<Recipe>> = context.dataStore.data.map { prefs ->
         prefs[KEY_RECIPES]?.let { Network.recipesAdapter.fromJson(it) } ?: emptyList()
@@ -24,6 +26,14 @@ class MealPlannerStore(private val context: Context) {
 
     val plannedWeekFlow: Flow<WeekResponse?> = context.dataStore.data.map { prefs ->
         prefs[KEY_PLANNED_WEEK]?.let { Network.weekAdapter.fromJson(it) }
+    }
+
+    val shoppingListFlow: Flow<ShoppingListResponse?> = context.dataStore.data.map { prefs ->
+        prefs[KEY_SHOPPING_LIST]?.let { Network.shoppingListAdapter.fromJson(it) }
+    }
+
+    val accessKeyFlow: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[KEY_ACCESS_KEY] ?: ""
     }
 
     suspend fun saveRecipes(recipes: List<Recipe>) {
@@ -44,5 +54,17 @@ class MealPlannerStore(private val context: Context) {
 
     suspend fun clearPlannedWeek() {
         context.dataStore.edit { it.remove(KEY_PLANNED_WEEK) }
+    }
+
+    suspend fun saveShoppingList(list: ShoppingListResponse) {
+        context.dataStore.edit { it[KEY_SHOPPING_LIST] = Network.shoppingListAdapter.toJson(list) }
+    }
+
+    suspend fun clearShoppingList() {
+        context.dataStore.edit { it.remove(KEY_SHOPPING_LIST) }
+    }
+
+    suspend fun saveAccessKey(key: String) {
+        context.dataStore.edit { it[KEY_ACCESS_KEY] = key }
     }
 }

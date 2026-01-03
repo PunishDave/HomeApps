@@ -18,8 +18,20 @@ class MealPlannerRepository(
     fun recipesFlow() = store.recipesFlow
     fun currentWeekFlow() = store.currentWeekFlow
     fun plannedWeekFlow() = store.plannedWeekFlow
+    fun shoppingListFlow() = store.shoppingListFlow
+    fun accessKeyFlow() = store.accessKeyFlow
+
     suspend fun saveLocalPlannedWeek(week: WeekResponse) = store.savePlannedWeek(week)
+    suspend fun saveLocalShoppingList(weekStart: String, items: List<String>) =
+        store.saveShoppingList(
+            ShoppingListResponse(
+                week_start = weekStart,
+                shopping_list = items.map { it.trim() }.filter { it.isNotEmpty() }
+            )
+        )
+    suspend fun saveAccessKey(key: String) = store.saveAccessKey(key)
     suspend fun clearPlannedWeek() = store.clearPlannedWeek()
+    suspend fun clearShoppingList() = store.clearShoppingList()
 
     // Match your UI week starting Saturday (change to MONDAY if needed)
     fun computeWeekStartIso(today: LocalDate = LocalDate.now(), startDay: DayOfWeek = DayOfWeek.SATURDAY): String {
@@ -64,7 +76,8 @@ class MealPlannerRepository(
         store.savePlannedWeek(week)
     }
 
-    suspend fun savePlannedWeekToServer(week: WeekResponse) {
+    suspend fun savePlannedWeekToServer(week: WeekResponse, key: String) {
+        val authKey = key.trim().ifEmpty { throw IllegalStateException("Access key required to save week.") }
         val ts = System.currentTimeMillis()
         // Convert [Recipe, Recipe, ...] to {"0": Recipe, "1": Recipe, ...}
         val mealsMap: Map<String, Recipe> =
@@ -75,13 +88,43 @@ class MealPlannerRepository(
             meals = mealsMap
         )
 
-        val saved = api.postWeek(body, ts)
+        val saved = api.postWeek(authKey, body, ts)
 
         // Only mirror to current-week cache if it matches the "current" start
         val startDay = LocalDate.parse(week.week_start).dayOfWeek
         if (week.week_start == computeWeekStartIso(LocalDate.now(), startDay)) {
             store.saveCurrentWeek(saved)
         }
+    }
+
+    suspend fun fetchShoppingList(weekStart: String): ShoppingListResponse {
+        val ts = System.currentTimeMillis()
+        return try {
+            val list = api.getShoppingList(weekStart, ts)
+            store.saveShoppingList(list)
+            list
+        } catch (e: HttpException) {
+            if (e.code() == 404) {
+                val empty = ShoppingListResponse(week_start = weekStart, shopping_list = emptyList())
+                store.saveShoppingList(empty)
+                empty
+            } else {
+                throw e
+            }
+        }
+    }
+
+    suspend fun pushShoppingList(weekStart: String, items: List<String>, key: String): ShoppingListResponse {
+        val authKey = key.trim().ifEmpty { throw IllegalStateException("Access key required to save shopping list.") }
+        val cleanedItems = items.map { it.trim() }.filter { it.isNotEmpty() }
+        val ts = System.currentTimeMillis()
+        val body = ShoppingListPostRequest(
+            week_start = weekStart,
+            items = cleanedItems
+        )
+        val saved = api.postShoppingList(authKey, body, ts)
+        store.saveShoppingList(saved)
+        return saved
     }
 
     private suspend fun fetchWeekForCandidates(

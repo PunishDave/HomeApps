@@ -2,12 +2,19 @@ package com.punishdave.homeapps
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,11 +51,13 @@ fun MealPlannerMenuScreen(
     onBack: () -> Unit,
     onOpenCurrentWeek: () -> Unit,
     onOpenPlanWeek: () -> Unit,
+    onOpenShoppingList: () -> Unit,
     onSync: () -> Unit
 ) {
     val vm: MealPlannerViewModel = viewModel()
     val syncing by vm.isSyncing.collectAsState()
     val lastErr by vm.lastError.collectAsState()
+    val accessKey by vm.accessKey.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = Bg) {
         Column(
@@ -57,7 +67,7 @@ fun MealPlannerMenuScreen(
                 .padding(horizontal = 20.dp, vertical = 20.dp)
                 .padding(top = 16.dp)
         ) {
-        Text(
+            Text(
                 text = "Meal Planner",
                 color = Accent,
                 fontSize = 30.sp,
@@ -95,8 +105,37 @@ fun MealPlannerMenuScreen(
                             .fillMaxWidth()
                             .widthIn(max = 420.dp)
                     )
+
+                    ActionCard(
+                        title = "Shopping List",
+                        subtitle = "Pull groceries and push updates for the week.",
+                        onClick = onOpenShoppingList,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = 420.dp)
+                    )
                 }
             }
+
+            OutlinedTextField(
+                value = accessKey,
+                onValueChange = { vm.saveAccessKey(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                label = { Text("Meal planner access key") },
+                placeholder = { Text("Required to save weeks and shopping lists") },
+                singleLine = true,
+                colors = TextFieldDefaults.outlinedTextFieldColors(
+                    focusedBorderColor = Accent,
+                    unfocusedBorderColor = Accent.copy(alpha = 0.6f),
+                    focusedLabelColor = Accent,
+                    unfocusedLabelColor = Color(0xFFB0B0B0),
+                    cursorColor = Accent,
+                    textColor = Color.White,
+                    placeholderColor = Color(0xFF8A8A8A)
+                )
+            )
 
             // Status / error line (small + unobtrusive)
             if (syncing) {
@@ -290,7 +329,247 @@ private fun CurrentWeekDayCard(
 }
 
 /* -----------------------
-   Screen 3: Plan a week
+   Screen 3: Shopping list
+------------------------ */
+
+@Composable
+fun MealPlannerShoppingListScreen(
+    onBack: () -> Unit
+) {
+    val vm: MealPlannerViewModel = viewModel()
+    val listState = vm.shoppingList.collectAsState().value
+    val currentWeek = vm.currentWeek.collectAsState().value
+    val plannedWeek = vm.plannedWeek.collectAsState().value
+    val newItem by vm.newShoppingItem.collectAsState()
+    val syncing by vm.isSyncing.collectAsState()
+    val lastErr by vm.lastError.collectAsState()
+    val syncStatus by vm.shoppingSyncStatus.collectAsState()
+    val accessKey by vm.accessKey.collectAsState()
+
+    val weekStart = listState?.week_start
+        ?: currentWeek?.week_start
+        ?: plannedWeek?.week_start
+        ?: startOfWeek(LocalDate.now(), DayOfWeek.SATURDAY).toString()
+    val weekLabel = remember(weekStart) {
+        runCatching { LocalDate.parse(weekStart).toDisplayDate() }.getOrElse { weekStart }
+    }
+    val items = listState?.shopping_list ?: emptyList()
+
+    Surface(modifier = Modifier.fillMaxSize(), color = Bg) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .padding(top = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TopTitleWithBack(title = "Shopping List", onBack = onBack)
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = PanelBg,
+                tonalElevation = 2.dp,
+                border = BorderStroke(1.dp, Accent.copy(alpha = 0.45f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Filled.ShoppingCart,
+                                contentDescription = null,
+                                tint = Accent
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Week of $weekLabel",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "$weekStart • ${items.size} items",
+                                    color = Color(0xFFB0B0B0),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                        FilledTonalButton(
+                            onClick = { vm.syncShoppingList() },
+                            enabled = !syncing,
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = Accent.copy(alpha = 0.6f),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(Icons.Filled.Sync, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (syncing) "Syncing…" else "Sync")
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = accessKey,
+                        onValueChange = { vm.saveAccessKey(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Access key") },
+                        placeholder = { Text("Needed to push changes") },
+                        singleLine = true,
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            focusedBorderColor = Accent,
+                            unfocusedBorderColor = Accent.copy(alpha = 0.6f),
+                            focusedLabelColor = Accent,
+                            unfocusedLabelColor = Color(0xFFB0B0B0),
+                            cursorColor = Accent,
+                            textColor = Color.White,
+                            placeholderColor = Color(0xFF8A8A8A)
+                        )
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = newItem,
+                    onValueChange = { vm.newShoppingItem.value = it },
+                    modifier = Modifier.weight(1f),
+                    label = { Text("Add item") },
+                    placeholder = { Text("e.g. Milk, chicken thighs") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { vm.addShoppingItem() }),
+                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                        focusedBorderColor = Accent,
+                        unfocusedBorderColor = Accent.copy(alpha = 0.6f),
+                        focusedLabelColor = Accent,
+                        unfocusedLabelColor = Color(0xFFB0B0B0),
+                        cursorColor = Accent,
+                        textColor = Color.White,
+                        placeholderColor = Color(0xFF8A8A8A)
+                    )
+                )
+
+                FilledTonalButton(
+                    onClick = { vm.addShoppingItem() },
+                    enabled = newItem.isNotBlank(),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = Accent.copy(alpha = 0.7f),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Add")
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                color = PanelBg,
+                tonalElevation = 2.dp,
+                border = BorderStroke(1.dp, Accent.copy(alpha = 0.35f))
+            ) {
+                if (items.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No items yet. Add one and tap Sync to push it.",
+                            color = Color(0xFFBDBDBD),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        contentPadding = PaddingValues(vertical = 10.dp)
+                    ) {
+                        itemsIndexed(items) { index, item ->
+                            ShoppingListRow(
+                                index = index,
+                                text = item,
+                                onRemove = { vm.removeShoppingItem(index) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (syncing) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Accent
+                )
+            }
+
+            if (lastErr != null) {
+                Text(
+                    text = lastErr ?: "",
+                    color = Color(0xFFFF8080),
+                    fontSize = 13.sp
+                )
+            } else if (syncStatus != null) {
+                Text(
+                    text = syncStatus ?: "",
+                    color = Color(0xFFBDBDBD),
+                    fontSize = 13.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShoppingListRow(
+    index: Int,
+    text: String,
+    onRemove: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "${index + 1}.",
+            color = Accent,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(28.dp)
+        )
+        Text(
+            text = text,
+            color = Color.White,
+            modifier = Modifier.weight(1f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        IconButton(onClick = onRemove) {
+            Icon(Icons.Filled.Delete, contentDescription = "Remove", tint = Color(0xFFFF9B9B))
+        }
+    }
+}
+
+/* -----------------------
+   Screen 4: Plan a week
 ------------------------ */
 
 @OptIn(ExperimentalMaterial3Api::class)

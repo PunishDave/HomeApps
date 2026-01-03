@@ -17,6 +17,7 @@ interface MealPlannerApi {
 
     @POST("weeks")
     suspend fun postWeek(
+        @Header("X-MP-Key") key: String,
         @Body body: WeekPostRequest,
         @Query("_ts") cacheBuster: Long? = null
     ): WeekResponse
@@ -25,6 +26,19 @@ interface MealPlannerApi {
     suspend fun getRecipes(
         @Query("_ts") cacheBuster: Long? = null
     ): List<Recipe>
+
+    @GET("shopping-list")
+    suspend fun getShoppingList(
+        @Query("week_start") weekStart: String,
+        @Query("_ts") cacheBuster: Long? = null
+    ): ShoppingListResponse
+
+    @POST("shopping-list")
+    suspend fun postShoppingList(
+        @Header("X-MP-Key") key: String,
+        @Body body: ShoppingListPostRequest,
+        @Query("_ts") cacheBuster: Long? = null
+    ): ShoppingListResponse
 }
 
 @JsonClass(generateAdapter = true)
@@ -49,4 +63,17 @@ data class WeekResponse(
 data class WeekPostRequest(
     val week_start: String,
     val meals: Map<String, Recipe>
+)
+
+@JsonClass(generateAdapter = true)
+data class ShoppingListResponse(
+    val week_start: String,
+    val shopping_list: List<String>,
+    val updated: Boolean? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class ShoppingListPostRequest(
+    val week_start: String,
+    val items: List<String>
 )

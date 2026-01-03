@@ -52,6 +52,7 @@ object Network {
 
     // DataStore JSON adapters
     val weekAdapter = moshi.adapter(WeekResponse::class.java)
+    val shoppingListAdapter = moshi.adapter(ShoppingListResponse::class.java)
 
     private val recipesType = Types.newParameterizedType(List::class.java, Recipe::class.java)
     val recipesAdapter = moshi.adapter<List<Recipe>>(recipesType)
