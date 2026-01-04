@@ -100,14 +100,10 @@ class MealPlannerRepository(
     suspend fun fetchShoppingList(weekStart: String): ShoppingListResponse {
         val ts = System.currentTimeMillis()
         return try {
-            val list = api.getShoppingList(weekStart, ts)
-            store.saveShoppingList(list)
-            list
+            api.getShoppingList(weekStart, ts)
         } catch (e: HttpException) {
             if (e.code() == 404) {
-                val empty = ShoppingListResponse(week_start = weekStart, shopping_list = emptyList())
-                store.saveShoppingList(empty)
-                empty
+                ShoppingListResponse(week_start = weekStart, shopping_list = emptyList())
             } else {
                 throw e
             }

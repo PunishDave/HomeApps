@@ -106,13 +106,18 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
             val targetWeek = shoppingWeekStart()
             val key = accessKey.value.trim()
 
+            // Capture local items before fetching to avoid overwriting new additions.
+            val localTarget = shoppingListForWeek(targetWeek)
+
             // Fetch the list for the target week (server may canonicalize the start day).
             val remote = repo.fetchShoppingList(targetWeek)
             val canonicalWeek = remote.week_start
 
-            // Only merge local items that match the canonical week to avoid bringing stale weeks back.
-            val local = shoppingListForWeek(canonicalWeek)
-            val merged = mergeLists(remote.shopping_list, local)
+            // Merge local items for both the requested and canonical week (in case the server shifts it).
+            val localCanonical = if (canonicalWeek != targetWeek) shoppingListForWeek(canonicalWeek) else localTarget
+            val localCombined = mergeLists(localTarget, localCanonical)
+
+            val merged = mergeLists(remote.shopping_list, localCombined)
             repo.saveLocalShoppingList(canonicalWeek, merged)
             shoppingSyncStatus.value = "Fetched list for $canonicalWeek (${remote.shopping_list.size} remote, ${merged.size} merged)."
 
