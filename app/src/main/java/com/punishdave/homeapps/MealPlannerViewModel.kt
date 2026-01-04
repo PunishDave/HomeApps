@@ -103,36 +103,25 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         lastError.value = null
         shoppingSyncStatus.value = "Syncing shopping list..."
         try {
-            val requestedWeek = shoppingWeekStart()
+            val targetWeek = shoppingWeekStart()
             val key = accessKey.value.trim()
 
-            // Try multiple candidate weeks (requested, current, next) and pick the best remote list.
-            val startDay = currentStartDay()
-            val candidates = linkedSetOf(
-                requestedWeek,
-                repo.computeWeekStartIso(LocalDate.now(), startDay),
-                repo.computeWeekStartIso(LocalDate.now().plusDays(7), startDay)
-            )
+            // Fetch the list for the target week (server may canonicalize the start day).
+            val remote = repo.fetchShoppingList(targetWeek)
+            val canonicalWeek = remote.week_start
 
-            val remoteLists = candidates.map { week ->
-                runCatching { repo.fetchShoppingList(week) }
-                    .getOrElse { ShoppingListResponse(week_start = week, shopping_list = emptyList()) }
-            }
-            val bestRemote = remoteLists.maxByOrNull { it.shopping_list.size } ?: remoteLists.first()
-            val targetWeek = bestRemote.week_start
-
-            // Merge any local items across candidate weeks into the remote list.
-            val localCombined = candidates.flatMap { shoppingListForWeek(it) }
-            val merged = mergeLists(bestRemote.shopping_list, localCombined)
-            repo.saveLocalShoppingList(targetWeek, merged)
-            shoppingSyncStatus.value = "Fetched list for $targetWeek (${bestRemote.shopping_list.size} remote, ${merged.size} merged)."
+            // Only merge local items that match the canonical week to avoid bringing stale weeks back.
+            val local = shoppingListForWeek(canonicalWeek)
+            val merged = mergeLists(remote.shopping_list, local)
+            repo.saveLocalShoppingList(canonicalWeek, merged)
+            shoppingSyncStatus.value = "Fetched list for $canonicalWeek (${remote.shopping_list.size} remote, ${merged.size} merged)."
 
             // If we have an access key, push the merged list back up.
             if (key.isNotEmpty()) {
-                val saved = repo.pushShoppingList(targetWeek, merged, key)
+                val saved = repo.pushShoppingList(canonicalWeek, merged, key)
                 shoppingSyncStatus.value = "Saved ${saved.shopping_list.size} items for ${saved.week_start}."
             } else {
-                shoppingSyncStatus.value = "Fetched list for $targetWeek. Add the access key to push changes."
+                shoppingSyncStatus.value = "Fetched list for $canonicalWeek. Add the access key to push changes."
             }
         } catch (e: Exception) {
             lastError.value = e.message ?: "Sync failed"
@@ -154,13 +143,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
 
         // Default: always use next week's start date based on the configured start day.
         val startDay = currentStartDay()
-        val nextWeekStart = repo.computeWeekStartIso(LocalDate.now().plusDays(7), startDay)
-
-        // If the cached list already targets that next week, reuse it; otherwise, stick to next week.
-        shoppingList.value?.takeIf { it.week_start == nextWeekStart }?.week_start?.let { return it }
-        // Otherwise, if a cached list exists, align to its week to stay consistent with the server.
-        shoppingList.value?.week_start?.let { return it }
-        return nextWeekStart
+        return repo.computeWeekStartIso(LocalDate.now().plusDays(7), startDay)
     }
 
     private fun mergeLists(remote: List<String>, local: List<String>): List<String> {
