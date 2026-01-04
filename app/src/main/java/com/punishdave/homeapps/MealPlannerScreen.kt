@@ -46,6 +46,7 @@ private fun startOfWeek(date: LocalDate, startDay: DayOfWeek): LocalDate =
    Screen 1: Menu
 ------------------------ */
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MealPlannerMenuScreen(
     onBack: () -> Unit,
@@ -132,8 +133,10 @@ fun MealPlannerMenuScreen(
                     focusedLabelColor = Accent,
                     unfocusedLabelColor = Color(0xFFB0B0B0),
                     cursorColor = Accent,
-                    textColor = Color.White,
-                    placeholderColor = Color(0xFF8A8A8A)
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedPlaceholderColor = Color(0xFF8A8A8A),
+                    unfocusedPlaceholderColor = Color(0xFF8A8A8A)
                 )
             )
 
@@ -332,6 +335,7 @@ private fun CurrentWeekDayCard(
    Screen 3: Shopping list
 ------------------------ */
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MealPlannerShoppingListScreen(
     onBack: () -> Unit
@@ -429,8 +433,10 @@ fun MealPlannerShoppingListScreen(
                             focusedLabelColor = Accent,
                             unfocusedLabelColor = Color(0xFFB0B0B0),
                             cursorColor = Accent,
-                            textColor = Color.White,
-                            placeholderColor = Color(0xFF8A8A8A)
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedPlaceholderColor = Color(0xFF8A8A8A),
+                            unfocusedPlaceholderColor = Color(0xFF8A8A8A)
                         )
                     )
                 }
@@ -456,8 +462,10 @@ fun MealPlannerShoppingListScreen(
                         focusedLabelColor = Accent,
                         unfocusedLabelColor = Color(0xFFB0B0B0),
                         cursorColor = Accent,
-                        textColor = Color.White,
-                        placeholderColor = Color(0xFF8A8A8A)
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedPlaceholderColor = Color(0xFF8A8A8A),
+                        unfocusedPlaceholderColor = Color(0xFF8A8A8A)
                     )
                 )
 
