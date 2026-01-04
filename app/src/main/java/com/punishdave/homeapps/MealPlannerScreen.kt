@@ -342,8 +342,6 @@ fun MealPlannerShoppingListScreen(
 ) {
     val vm: MealPlannerViewModel = viewModel()
     val listState = vm.shoppingList.collectAsState().value
-    val currentWeek = vm.currentWeek.collectAsState().value
-    val plannedWeek = vm.plannedWeek.collectAsState().value
     val newItem by vm.newShoppingItem.collectAsState()
     val syncing by vm.isSyncing.collectAsState()
     val lastErr by vm.lastError.collectAsState()

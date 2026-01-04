@@ -137,14 +137,16 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun shoppingWeekStart(): String {
-        // Prefer the planned/upcoming week, otherwise stick with the cached list's week.
+        // Prefer explicitly planned upcoming week if present.
         plannedWeek.value?.week_start?.let { return it }
-        shoppingList.value?.week_start?.let { return it }
 
-        // Default to next week's start date (not the current week's).
+        // Default: always use next week's start date based on the configured start day.
         val startDay = currentStartDay()
-        val currentStart = repo.computeWeekStartIso(LocalDate.now(), startDay)
-        return LocalDate.parse(currentStart).plusDays(7).toString()
+        val nextWeekStart = repo.computeWeekStartIso(LocalDate.now().plusDays(7), startDay)
+
+        // If the cached list already targets that next week, reuse it; otherwise, stick to next week.
+        shoppingList.value?.takeIf { it.week_start == nextWeekStart }?.week_start?.let { return it }
+        return nextWeekStart
     }
 
     private fun mergeLists(remote: List<String>, local: List<String>): List<String> {
