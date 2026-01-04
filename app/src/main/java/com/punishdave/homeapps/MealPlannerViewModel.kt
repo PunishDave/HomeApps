@@ -127,7 +127,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
 
             val merged = mergeLists(remote.shopping_list, pendingCombined.toList())
             repo.saveLocalShoppingList(canonicalWeek, merged)
-            shoppingSyncStatus.value = "Fetched list for $canonicalWeek (${remote.shopping_list.size} remote, ${merged.size} merged)."
+            shoppingSyncStatus.value = "Fetched list for ${formatDateForDisplay(canonicalWeek) ?: canonicalWeek} (${remote.shopping_list.size} remote, ${merged.size} merged)."
 
             // If we have an access key, push the merged list back up.
             if (key.isNotEmpty()) {
@@ -135,7 +135,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
                 pendingShoppingAdds[canonicalWeek]?.clear()
                 shoppingSyncStatus.value = "Saved ${saved.shopping_list.size} items for ${saved.week_start}."
             } else {
-                shoppingSyncStatus.value = "Fetched list for $canonicalWeek. Add the access key to push changes."
+                shoppingSyncStatus.value = "Fetched list for ${formatDateForDisplay(canonicalWeek) ?: canonicalWeek}. Add the access key to push changes."
             }
         } catch (e: Exception) {
             lastError.value = e.message ?: "Sync failed"
