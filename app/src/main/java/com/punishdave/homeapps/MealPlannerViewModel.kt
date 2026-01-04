@@ -104,23 +104,21 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         shoppingSyncStatus.value = "Syncing shopping list..."
         try {
             val weekStart = shoppingWeekStart()
-            val items = shoppingListForWeek(weekStart)
-            val hasLocalList = shoppingList.value?.week_start == weekStart
             val key = accessKey.value.trim()
-            if (key.isEmpty()) {
-                val remote = repo.fetchShoppingList(weekStart)
-                val merged = mergeLists(remote.shopping_list, items)
-                repo.saveLocalShoppingList(remote.week_start, merged)
-                shoppingSyncStatus.value = "Fetched list for ${remote.week_start}. Add the access key to push changes."
-                return@launch
-            }
+            val localItems = shoppingListForWeek(weekStart)
 
-            if (items.isNotEmpty() || hasLocalList) {
-                val saved = repo.pushShoppingList(weekStart, items, key)
+            // Always fetch from the API first so we pull remote changes.
+            val remote = repo.fetchShoppingList(weekStart)
+            val merged = mergeLists(remote.shopping_list, localItems)
+            repo.saveLocalShoppingList(remote.week_start, merged)
+            shoppingSyncStatus.value = "Fetched list for ${remote.week_start} (${remote.shopping_list.size} remote, ${merged.size} merged)."
+
+            // If we have an access key, push the merged list back up.
+            if (key.isNotEmpty()) {
+                val saved = repo.pushShoppingList(weekStart, merged, key)
                 shoppingSyncStatus.value = "Saved ${saved.shopping_list.size} items for ${saved.week_start}."
             } else {
-                val remote = repo.fetchShoppingList(weekStart)
-                shoppingSyncStatus.value = "Fetched list for ${remote.week_start} (${remote.shopping_list.size} items)."
+                shoppingSyncStatus.value = "Fetched list for ${remote.week_start}. Add the access key to push changes."
             }
         } catch (e: Exception) {
             lastError.value = e.message ?: "Sync failed"
