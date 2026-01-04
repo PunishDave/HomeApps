@@ -119,7 +119,6 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
             val canonicalWeek = remote.week_start
 
             // Merge local items for both the requested and canonical week (in case the server shifts it).
-            val localCanonical = if (canonicalWeek != targetWeek) shoppingListForWeek(canonicalWeek) else localTarget
             val pendingCanonical = if (canonicalWeek != targetWeek) pendingShoppingAdds[canonicalWeek].orEmpty() else pendingTarget
 
             // Only keep locally added (pending) items to avoid resurrecting remote-deleted entries.
