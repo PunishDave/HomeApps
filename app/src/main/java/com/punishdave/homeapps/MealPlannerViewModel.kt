@@ -103,22 +103,28 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         lastError.value = null
         shoppingSyncStatus.value = "Syncing shopping list..."
         try {
-            val weekStart = shoppingWeekStart()
+            val requestedWeek = shoppingWeekStart()
             val key = accessKey.value.trim()
-            val localItems = shoppingListForWeek(weekStart)
 
             // Always fetch from the API first so we pull remote changes.
-            val remote = repo.fetchShoppingList(weekStart)
-            val merged = mergeLists(remote.shopping_list, localItems)
-            repo.saveLocalShoppingList(remote.week_start, merged)
-            shoppingSyncStatus.value = "Fetched list for ${remote.week_start} (${remote.shopping_list.size} remote, ${merged.size} merged)."
+            val remote = repo.fetchShoppingList(requestedWeek)
+            val targetWeek = remote.week_start
+
+            // Merge any local items we have for either the requested or canonical week with the remote.
+            val localRequested = shoppingListForWeek(requestedWeek)
+            val localTarget = shoppingListForWeek(targetWeek)
+            val combinedLocal = mergeLists(localRequested, localTarget)
+
+            val merged = mergeLists(remote.shopping_list, combinedLocal)
+            repo.saveLocalShoppingList(targetWeek, merged)
+            shoppingSyncStatus.value = "Fetched list for $targetWeek (${remote.shopping_list.size} remote, ${merged.size} merged)."
 
             // If we have an access key, push the merged list back up.
             if (key.isNotEmpty()) {
-                val saved = repo.pushShoppingList(weekStart, merged, key)
+                val saved = repo.pushShoppingList(targetWeek, merged, key)
                 shoppingSyncStatus.value = "Saved ${saved.shopping_list.size} items for ${saved.week_start}."
             } else {
-                shoppingSyncStatus.value = "Fetched list for ${remote.week_start}. Add the access key to push changes."
+                shoppingSyncStatus.value = "Fetched list for $targetWeek. Add the access key to push changes."
             }
         } catch (e: Exception) {
             lastError.value = e.message ?: "Sync failed"
@@ -144,6 +150,8 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
 
         // If the cached list already targets that next week, reuse it; otherwise, stick to next week.
         shoppingList.value?.takeIf { it.week_start == nextWeekStart }?.week_start?.let { return it }
+        // Otherwise, if a cached list exists, align to its week to stay consistent with the server.
+        shoppingList.value?.week_start?.let { return it }
         return nextWeekStart
     }
 
