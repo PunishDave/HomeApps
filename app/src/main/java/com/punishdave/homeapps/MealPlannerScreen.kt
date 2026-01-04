@@ -350,14 +350,11 @@ fun MealPlannerShoppingListScreen(
     val syncStatus by vm.shoppingSyncStatus.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
 
-    val weekStart = listState?.week_start
-        ?: currentWeek?.week_start
-        ?: plannedWeek?.week_start
-        ?: startOfWeek(LocalDate.now(), DayOfWeek.SATURDAY).toString()
+    val weekStart = vm.shoppingWeekStart()
     val weekLabel = remember(weekStart) {
         runCatching { LocalDate.parse(weekStart).toDisplayDate() }.getOrElse { weekStart }
     }
-    val items = listState?.shopping_list ?: emptyList()
+    val items = listState?.takeIf { it.week_start == weekStart }?.shopping_list ?: emptyList()
 
     Surface(modifier = Modifier.fillMaxSize(), color = Bg) {
         Column(

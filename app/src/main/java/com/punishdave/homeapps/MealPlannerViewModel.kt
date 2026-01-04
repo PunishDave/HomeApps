@@ -85,15 +85,15 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         val input = newShoppingItem.value.trim()
         if (input.isEmpty()) return@launch
         val weekStart = shoppingWeekStart()
-        val current = shoppingList.value?.shopping_list.orEmpty()
+        val current = shoppingListForWeek(weekStart)
         repo.saveLocalShoppingList(weekStart, current + input)
         newShoppingItem.value = ""
     }
 
     fun removeShoppingItem(index: Int) = viewModelScope.launch {
-        val current = shoppingList.value?.shopping_list.orEmpty()
-        if (index !in current.indices) return@launch
         val weekStart = shoppingWeekStart()
+        val current = shoppingListForWeek(weekStart)
+        if (index !in current.indices) return@launch
         val updated = current.toMutableList().apply { removeAt(index) }
         repo.saveLocalShoppingList(weekStart, updated)
     }
@@ -104,8 +104,8 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         shoppingSyncStatus.value = "Syncing shopping list..."
         try {
             val weekStart = shoppingWeekStart()
-            val hasLocalList = shoppingList.value != null
-            val items = shoppingList.value?.shopping_list.orEmpty()
+            val items = shoppingListForWeek(weekStart)
+            val hasLocalList = shoppingList.value?.week_start == weekStart
             val key = accessKey.value.trim()
             if (key.isEmpty()) {
                 val remote = repo.fetchShoppingList(weekStart)
@@ -136,11 +136,15 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         return DayOfWeek.SATURDAY
     }
 
-    private fun shoppingWeekStart(): String {
-        shoppingList.value?.week_start?.let { return it }
-        currentWeek.value?.week_start?.let { return it }
+    fun shoppingWeekStart(): String {
+        // Prefer the planned/upcoming week, otherwise stick with the cached list's week.
         plannedWeek.value?.week_start?.let { return it }
-        return repo.computeWeekStartIso(LocalDate.now(), currentStartDay())
+        shoppingList.value?.week_start?.let { return it }
+
+        // Default to next week's start date (not the current week's).
+        val startDay = currentStartDay()
+        val currentStart = repo.computeWeekStartIso(LocalDate.now(), startDay)
+        return LocalDate.parse(currentStart).plusDays(7).toString()
     }
 
     private fun mergeLists(remote: List<String>, local: List<String>): List<String> {
@@ -152,5 +156,11 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
             if (item.isNotEmpty() && !merged.contains(item)) merged += item
         }
         return merged
+    }
+
+    private fun shoppingListForWeek(weekStart: String): List<String> {
+        val list = shoppingList.value
+        if (list?.week_start == weekStart) return list.shopping_list
+        return emptyList()
     }
 }
