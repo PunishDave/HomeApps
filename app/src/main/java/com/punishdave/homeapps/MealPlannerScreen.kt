@@ -127,7 +127,7 @@ fun MealPlannerMenuScreen(
                 label = { Text("Meal planner access key") },
                 placeholder = { Text("Required to save weeks and shopping lists") },
                 singleLine = true,
-                colors = TextFieldDefaults.outlinedTextFieldColors(
+                colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = Accent,
                     unfocusedBorderColor = Accent.copy(alpha = 0.6f),
                     focusedLabelColor = Accent,
@@ -427,7 +427,7 @@ fun MealPlannerShoppingListScreen(
                         label = { Text("Access key") },
                         placeholder = { Text("Needed to push changes") },
                         singleLine = true,
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                        colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Accent,
                             unfocusedBorderColor = Accent.copy(alpha = 0.6f),
                             focusedLabelColor = Accent,
@@ -456,7 +456,7 @@ fun MealPlannerShoppingListScreen(
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { vm.addShoppingItem() }),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
+                    colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Accent,
                         unfocusedBorderColor = Accent.copy(alpha = 0.6f),
                         focusedLabelColor = Accent,
