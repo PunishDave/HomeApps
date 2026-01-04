@@ -395,7 +395,7 @@ fun MealPlannerShoppingListScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "$weekStart • ${items.size} items",
+                                    text = "$weekLabel • ${items.size} items",
                                     color = Color(0xFFB0B0B0),
                                     fontSize = 13.sp
                                 )
