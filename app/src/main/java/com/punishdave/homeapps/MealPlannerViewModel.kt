@@ -106,18 +106,26 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
             val requestedWeek = shoppingWeekStart()
             val key = accessKey.value.trim()
 
-            // Always fetch from the API first so we pull remote changes.
-            val remote = repo.fetchShoppingList(requestedWeek)
-            val targetWeek = remote.week_start
+            // Try multiple candidate weeks (requested, current, next) and pick the best remote list.
+            val startDay = currentStartDay()
+            val candidates = linkedSetOf(
+                requestedWeek,
+                repo.computeWeekStartIso(LocalDate.now(), startDay),
+                repo.computeWeekStartIso(LocalDate.now().plusDays(7), startDay)
+            )
 
-            // Merge any local items we have for either the requested or canonical week with the remote.
-            val localRequested = shoppingListForWeek(requestedWeek)
-            val localTarget = shoppingListForWeek(targetWeek)
-            val combinedLocal = mergeLists(localRequested, localTarget)
+            val remoteLists = candidates.map { week ->
+                runCatching { repo.fetchShoppingList(week) }
+                    .getOrElse { ShoppingListResponse(week_start = week, shopping_list = emptyList()) }
+            }
+            val bestRemote = remoteLists.maxByOrNull { it.shopping_list.size } ?: remoteLists.first()
+            val targetWeek = bestRemote.week_start
 
-            val merged = mergeLists(remote.shopping_list, combinedLocal)
+            // Merge any local items across candidate weeks into the remote list.
+            val localCombined = candidates.flatMap { shoppingListForWeek(it) }
+            val merged = mergeLists(bestRemote.shopping_list, localCombined)
             repo.saveLocalShoppingList(targetWeek, merged)
-            shoppingSyncStatus.value = "Fetched list for $targetWeek (${remote.shopping_list.size} remote, ${merged.size} merged)."
+            shoppingSyncStatus.value = "Fetched list for $targetWeek (${bestRemote.shopping_list.size} remote, ${merged.size} merged)."
 
             // If we have an access key, push the merged list back up.
             if (key.isNotEmpty()) {
