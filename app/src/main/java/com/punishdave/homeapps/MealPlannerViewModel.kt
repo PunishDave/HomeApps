@@ -110,8 +110,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
             val targetWeek = shoppingWeekStart()
             val key = accessKey.value.trim()
 
-            // Capture local items before fetching to avoid overwriting new additions.
-            val localTarget = shoppingListForWeek(targetWeek)
+            // Capture pending local additions before fetching to avoid overwriting new additions.
             val pendingTarget = pendingShoppingAdds[targetWeek].orEmpty()
 
             // Fetch the list for the target week (server may canonicalize the start day).
@@ -132,7 +131,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
             if (key.isNotEmpty()) {
                 val saved = repo.pushShoppingList(canonicalWeek, merged, key)
                 pendingShoppingAdds[canonicalWeek]?.clear()
-                shoppingSyncStatus.value = "Saved ${saved.shopping_list.size} items for ${saved.week_start}."
+                shoppingSyncStatus.value = "Saved ${saved.shopping_list.size} items for ${formatDateForDisplay(saved.week_start) ?: saved.week_start}."
             } else {
                 shoppingSyncStatus.value = "Fetched list for ${formatDateForDisplay(canonicalWeek) ?: canonicalWeek}. Add the access key to push changes."
             }
