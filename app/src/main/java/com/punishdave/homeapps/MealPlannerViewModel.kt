@@ -23,6 +23,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
     val lastError = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     val shoppingSyncStatus = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     val newShoppingItem = kotlinx.coroutines.flow.MutableStateFlow("")
+    private val pendingShoppingAdds = mutableMapOf<String, MutableSet<String>>() // week_start -> locally added items not yet confirmed pushed
 
     fun sync() = viewModelScope.launch {
         isSyncing.value = true
@@ -87,6 +88,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         val weekStart = shoppingWeekStart()
         val current = shoppingListForWeek(weekStart)
         repo.saveLocalShoppingList(weekStart, current + input)
+        markPendingAdd(weekStart, input)
         newShoppingItem.value = ""
     }
 
@@ -94,8 +96,10 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         val weekStart = shoppingWeekStart()
         val current = shoppingListForWeek(weekStart)
         if (index !in current.indices) return@launch
+        val removed = current[index].trim()
         val updated = current.toMutableList().apply { removeAt(index) }
         repo.saveLocalShoppingList(weekStart, updated)
+        clearPendingAdd(weekStart, removed)
     }
 
     fun syncShoppingList() = viewModelScope.launch {
@@ -108,6 +112,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
 
             // Capture local items before fetching to avoid overwriting new additions.
             val localTarget = shoppingListForWeek(targetWeek)
+            val pendingTarget = pendingShoppingAdds[targetWeek].orEmpty()
 
             // Fetch the list for the target week (server may canonicalize the start day).
             val remote = repo.fetchShoppingList(targetWeek)
@@ -115,15 +120,19 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
 
             // Merge local items for both the requested and canonical week (in case the server shifts it).
             val localCanonical = if (canonicalWeek != targetWeek) shoppingListForWeek(canonicalWeek) else localTarget
-            val localCombined = mergeLists(localTarget, localCanonical)
+            val pendingCanonical = if (canonicalWeek != targetWeek) pendingShoppingAdds[canonicalWeek].orEmpty() else pendingTarget
 
-            val merged = mergeLists(remote.shopping_list, localCombined)
+            // Only keep locally added (pending) items to avoid resurrecting remote-deleted entries.
+            val pendingCombined = (pendingTarget + pendingCanonical).map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+            val merged = mergeLists(remote.shopping_list, pendingCombined.toList())
             repo.saveLocalShoppingList(canonicalWeek, merged)
             shoppingSyncStatus.value = "Fetched list for $canonicalWeek (${remote.shopping_list.size} remote, ${merged.size} merged)."
 
             // If we have an access key, push the merged list back up.
             if (key.isNotEmpty()) {
                 val saved = repo.pushShoppingList(canonicalWeek, merged, key)
+                pendingShoppingAdds[canonicalWeek]?.clear()
                 shoppingSyncStatus.value = "Saved ${saved.shopping_list.size} items for ${saved.week_start}."
             } else {
                 shoppingSyncStatus.value = "Fetched list for $canonicalWeek. Add the access key to push changes."
@@ -166,5 +175,15 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
         val list = shoppingList.value
         if (list?.week_start == weekStart) return list.shopping_list
         return emptyList()
+    }
+
+    private fun markPendingAdd(weekStart: String, item: String) {
+        if (item.isBlank()) return
+        pendingShoppingAdds.getOrPut(weekStart) { mutableSetOf() }.add(item.trim())
+    }
+
+    private fun clearPendingAdd(weekStart: String, item: String) {
+        if (item.isBlank()) return
+        pendingShoppingAdds[weekStart]?.remove(item.trim())
     }
 }
