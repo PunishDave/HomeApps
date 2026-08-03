@@ -164,7 +164,13 @@ class MainActivity : ComponentActivity() {
                     composable(Route.Sophon.id) {
                         val settingsVm: AppSettingsViewModel = viewModel()
                         val sophonUrl by settingsVm.sophonUrl.collectAsState()
-                        WebAppScreen("Sophon", sophonUrl) { navController.popBackStack() }
+                        if (sophonUrl.isBlank()) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = Color(0xFFE66A64))
+                            }
+                        } else {
+                            WebAppScreen("Sophon", sophonUrl) { navController.popBackStack() }
+                        }
                     }
                     composable(Route.Droplet.id) {
                         WebAppScreen("Droplet", DROPLET_URL) { navController.popBackStack() }
@@ -324,6 +330,7 @@ private fun WebAppScreen(
 ) {
     var webView by androidx.compose.runtime.remember { mutableStateOf<WebView?>(null) }
     var loading by androidx.compose.runtime.remember { mutableStateOf(true) }
+    var loadedRootUrl by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
     val currentUsername by androidx.compose.runtime.rememberUpdatedState(username)
     val currentPassword by androidx.compose.runtime.rememberUpdatedState(password)
 
@@ -344,7 +351,15 @@ private fun WebAppScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onBack) { Text("Back") }
-                    Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = url,
+                            color = Color(0xFF8D8D8D),
+                            fontSize = 10.sp,
+                            maxLines = 1
+                        )
+                    }
                 }
             }
         }
@@ -381,6 +396,7 @@ private fun WebAppScreen(
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         loadUrl(url)
+                        loadedRootUrl = url
                         webView = this
                     }
                     refreshLayout.setColorSchemeColors(0xFFE66A64.toInt())
@@ -397,7 +413,12 @@ private fun WebAppScreen(
                     refreshLayout
                 },
                 update = { refreshLayout ->
-                    webView = refreshLayout.getChildAt(0) as? WebView
+                    val browser = refreshLayout.getChildAt(0) as? WebView
+                    webView = browser
+                    if (browser != null && loadedRootUrl != url) {
+                        loadedRootUrl = url
+                        browser.loadUrl(url)
+                    }
                 }
             )
             if (loading) {

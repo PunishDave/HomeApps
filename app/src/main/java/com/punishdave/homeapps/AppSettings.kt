@@ -51,7 +51,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val sophonUrl = context.webSettingsDataStore.data
         .map { it[sophonUrlKey] ?: "http://192.168.0.234:8096" }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "http://192.168.0.234:8096")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
 
     var saveStatus by mutableStateOf<String?>(null)
         private set
