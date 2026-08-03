@@ -16,7 +16,7 @@ class MealPlannerViewModel(app: Application) : AndroidViewModel(app) {
     val currentWeek = repo.currentWeekFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val plannedWeek = repo.plannedWeekFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val shoppingList = repo.shoppingListFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     // simple UI flags
     val isSyncing = kotlinx.coroutines.flow.MutableStateFlow(false)

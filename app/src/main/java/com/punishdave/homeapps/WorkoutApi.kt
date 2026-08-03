@@ -107,6 +107,8 @@ data class WorkoutMove(
     val name: String,
     val type: String? = null,
     val reps: Int? = null,
+    val duration_seconds: Int? = null,
+    val media_url: String? = null,
     val last_weight: String? = null,
     val last_reps: Int? = null,
     val last_performed_on: String? = null

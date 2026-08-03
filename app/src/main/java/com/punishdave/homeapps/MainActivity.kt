@@ -1,7 +1,13 @@
 package com.punishdave.homeapps
 
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.view.ViewGroup
+import android.webkit.HttpAuthHandler
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -16,9 +22,19 @@ import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -30,11 +46,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
@@ -51,7 +69,17 @@ private sealed class Route(val id: String) {
     data object HaveWeGot : Route("have_we_got")
     data object Todo : Route("todo")
     data object WorkoutLog : Route("workout_log")
+    data object Transmission : Route("transmission")
+    data object Wallfacer : Route("wallfacer")
+    data object Sophon : Route("sophon")
+    data object Droplet : Route("droplet")
+    data object Settings : Route("settings")
 }
+
+private const val TRANSMISSION_URL = "http://192.168.0.234:9091/"
+private const val WALLFACER_URL = "http://192.168.0.116:8080"
+private const val SOPHON_URL = "http://192.168.0.234:8096"
+private const val DROPLET_URL = "http://192.168.0.234:8095"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,7 +98,12 @@ class MainActivity : ComponentActivity() {
                             onOpenMealPlanner = { navController.navigate(Route.MealPlannerMenu.id) },
                             onOpenHaveWeGot = { navController.navigate(Route.HaveWeGot.id) },
                             onOpenTodo = { navController.navigate(Route.Todo.id) },
-                            onOpenWorkoutLog = { navController.navigate(Route.WorkoutLog.id) }
+                            onOpenWorkoutLog = { navController.navigate(Route.WorkoutLog.id) },
+                            onOpenTransmission = { navController.navigate(Route.Transmission.id) },
+                            onOpenWallfacer = { navController.navigate(Route.Wallfacer.id) },
+                            onOpenSophon = { navController.navigate(Route.Sophon.id) },
+                            onOpenDroplet = { navController.navigate(Route.Droplet.id) },
+                            onOpenSettings = { navController.navigate(Route.Settings.id) }
                         )
                     }
 
@@ -119,6 +152,26 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() }
                         )
                     }
+                    composable(Route.Transmission.id) {
+                        val settingsVm: AppSettingsViewModel = viewModel()
+                        val username by settingsVm.transmissionUsername.collectAsState()
+                        val password by settingsVm.transmissionPassword.collectAsState()
+                        WebAppScreen("Transmission", TRANSMISSION_URL, username, password) { navController.popBackStack() }
+                    }
+                    composable(Route.Wallfacer.id) {
+                        WebAppScreen("Wallfacer", WALLFACER_URL) { navController.popBackStack() }
+                    }
+                    composable(Route.Sophon.id) {
+                        val settingsVm: AppSettingsViewModel = viewModel()
+                        val sophonUrl by settingsVm.sophonUrl.collectAsState()
+                        WebAppScreen("Sophon", sophonUrl) { navController.popBackStack() }
+                    }
+                    composable(Route.Droplet.id) {
+                        WebAppScreen("Droplet", DROPLET_URL) { navController.popBackStack() }
+                    }
+                    composable(Route.Settings.id) {
+                        AppSettingsScreen { navController.popBackStack() }
+                    }
                 }
             }
         }
@@ -139,135 +192,233 @@ private fun PlaceholderScreen(title: String) {
 ------------------------ */
 
 @Composable
+@OptIn(ExperimentalMaterialApi::class)
 fun HomeAppsScreen(
     onOpenMealPlanner: () -> Unit,
     onOpenHaveWeGot: () -> Unit,
     onOpenTodo: () -> Unit,
-    onOpenWorkoutLog: () -> Unit
+    onOpenWorkoutLog: () -> Unit,
+    onOpenTransmission: () -> Unit,
+    onOpenWallfacer: () -> Unit,
+    onOpenSophon: () -> Unit,
+    onOpenDroplet: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val mealVm: MealPlannerViewModel = viewModel()
     val haveVm: HaveWeGotViewModel = viewModel()
     val todoVm: TodoViewModel = viewModel()
 
-    val bg = Color(0xFF2A2A2A)
-    val accent = Color(0xFFB00020)
+    val bg = Color(0xFF1C1C1C)
+    val accent = Color(0xFFE66A64)
     var syncingAll by rememberSaveable { mutableStateOf(false) }
     var syncAllMsg by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val syncAll: () -> Unit = {
+        if (!syncingAll) {
+            syncingAll = true
+            syncAllMsg = "Refreshing home apps..."
+            scope.launch {
+                try {
+                    val jobs = mutableListOf<Job>()
+                    jobs += mealVm.sync()
+                    jobs += haveVm.refresh()
+                    jobs += todoVm.syncFromApi()
+                    jobs.joinAll()
+                    syncAllMsg = "Up to date"
+                } catch (_: Exception) {
+                    syncAllMsg = "Refresh finished with an error"
+                } finally {
+                    syncingAll = false
+                }
+            }
+        }
+    }
+    val pullRefreshState = rememberPullRefreshState(syncingAll, syncAll)
 
     val cards = listOf(
         HomeCard(
             title = "Meal Planner",
-            icon = { Icon(Icons.Filled.Restaurant, contentDescription = null, modifier = Modifier.size(44.dp)) },
+            icon = { Icon(Icons.Filled.Restaurant, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = onOpenMealPlanner
         ),
         HomeCard(
             title = "Have We Got",
-            icon = { Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(44.dp)) },
+            icon = { Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = onOpenHaveWeGot
         ),
         HomeCard(
             title = "To-Do",
-            icon = { Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(44.dp)) },
+            icon = { Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = onOpenTodo
         ),
         HomeCard(
             title = "Workout Log",
-            icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null, modifier = Modifier.size(44.dp)) },
+            icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = onOpenWorkoutLog
+        ),
+        HomeCard(
+            title = "Transmission",
+            icon = { Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.size(24.dp)) },
+            onClick = onOpenTransmission
+        ),
+        HomeCard(
+            title = "Wallfacer",
+            icon = { Icon(Icons.Filled.Wallpaper, contentDescription = null, modifier = Modifier.size(24.dp)) },
+            onClick = onOpenWallfacer
+        ),
+        HomeCard(
+            title = "Sophon",
+            icon = { Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(24.dp)) },
+            onClick = onOpenSophon
+        ),
+        HomeCard(
+            title = "Droplet",
+            icon = { Icon(Icons.Filled.CloudQueue, contentDescription = null, modifier = Modifier.size(24.dp)) },
+            onClick = onOpenDroplet
         )
     )
 
     Surface(modifier = Modifier.fillMaxSize(), color = bg) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()   // <-- adds safe top inset
-                .padding(horizontal = 24.dp, vertical = 24.dp)
-                .padding(top = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-        Text(
-                text = "Home Apps",
-                color = accent,
-                fontSize = 34.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            FilledTonalButton(
-                onClick = {
-                    if (syncingAll) return@FilledTonalButton
-                    syncingAll = true
-                    syncAllMsg = "Syncing all apps..."
-                    scope.launch {
-                        try {
-                            val jobs = mutableListOf<Job>()
-                            jobs += mealVm.sync()
-                            jobs += haveVm.refresh()
-                            if (todoVm.accessKey.value.isNotBlank()) {
-                                jobs += todoVm.syncFromApi()
-                            }
-                            jobs.joinAll()
-                            syncAllMsg = "Sync complete."
-                        } catch (_: Exception) {
-                            syncAllMsg = "Sync started; check individual apps for status."
-                        } finally {
-                            delay(1200)
-                            syncingAll = false
-                        }
-                    }
-                },
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = accent.copy(alpha = 0.6f),
-                    contentColor = Color.White
-                ),
-                enabled = !syncingAll
+        Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 16.dp)
             ) {
-                Icon(Icons.Filled.Sync, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (syncingAll) "Syncing..." else "Sync All")
+                Text("Home", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = syncAllMsg ?: "Pull down to refresh",
+                    color = Color(0xFF8D8D8D),
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                HomeAppsGrid(cards = cards, accent = accent, modifier = Modifier.weight(1f))
+                Spacer(Modifier.height(12.dp))
+                AppCard(
+                    title = "Settings",
+                    accent = accent,
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(24.dp)) },
+                    onClick = onOpenSettings,
+                    modifier = Modifier.fillMaxWidth().height(64.dp)
+                )
             }
-
-            syncAllMsg?.let { msg ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    if (syncingAll) {
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .padding(end = 8.dp),
-                            color = accent,
-                            strokeWidth = 2.dp
-                        )
-                    }
-                    Text(
-                        text = msg,
-                        color = Color(0xFFBDBDBD),
-                        fontSize = 13.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            HomeAppsGrid(cards = cards, accent = accent)
+            PullRefreshIndicator(
+                refreshing = syncingAll,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                backgroundColor = Color(0xFF161616),
+                contentColor = accent
+            )
         }
     }
 }
 
 @Composable
-private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color) {
+private fun WebAppScreen(
+    title: String,
+    url: String,
+    username: String = "",
+    password: String = "",
+    onBack: () -> Unit
+) {
+    var webView by androidx.compose.runtime.remember { mutableStateOf<WebView?>(null) }
+    var loading by androidx.compose.runtime.remember { mutableStateOf(true) }
+    val currentUsername by androidx.compose.runtime.rememberUpdatedState(username)
+    val currentPassword by androidx.compose.runtime.rememberUpdatedState(password)
+
+    BackHandler {
+        val view = webView
+        if (view?.canGoBack() == true) view.goBack() else onBack()
+    }
+
+    Scaffold(
+        topBar = {
+            Surface(color = Color(0xFF0F0F0F), shadowElevation = 4.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .height(56.dp)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onBack) { Text("Back") }
+                    Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { context ->
+                    val refreshLayout = SwipeRefreshLayout(context)
+                    val browser = WebView(context).apply {
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                                loading = true
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                loading = false
+                                (view?.parent as? SwipeRefreshLayout)?.isRefreshing = false
+                            }
+
+                            override fun onReceivedHttpAuthRequest(
+                                view: WebView?,
+                                handler: HttpAuthHandler?,
+                                host: String?,
+                                realm: String?
+                            ) {
+                                if (currentUsername.isNotBlank() || currentPassword.isNotBlank()) {
+                                    handler?.proceed(currentUsername, currentPassword)
+                                } else {
+                                    handler?.cancel()
+                                }
+                            }
+                        }
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        loadUrl(url)
+                        webView = this
+                    }
+                    refreshLayout.setColorSchemeColors(0xFFE66A64.toInt())
+                    refreshLayout.setProgressBackgroundColorSchemeColor(0xFF222222.toInt())
+                    refreshLayout.setOnChildScrollUpCallback { _, _ -> browser.canScrollVertically(-1) }
+                    refreshLayout.setOnRefreshListener { browser.reload() }
+                    refreshLayout.addView(
+                        browser,
+                        ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    )
+                    refreshLayout
+                },
+                update = { refreshLayout ->
+                    webView = refreshLayout.getChildAt(0) as? WebView
+                }
+            )
+            if (loading) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                    color = Color(0xFFE66A64),
+                    trackColor = Color.Transparent
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color, modifier: Modifier = Modifier) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 170.dp),
-        modifier = Modifier.fillMaxWidth(),
+        columns = GridCells.Adaptive(minSize = 150.dp),
+        modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(top = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         items(cards) { card ->
             AppCard(
@@ -277,7 +428,7 @@ private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color) {
                 onClick = card.onClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1.25f)
+                    .height(72.dp)
             )
         }
     }
@@ -291,33 +442,35 @@ private fun AppCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val cardBg = Color(0xFF0F0F0F)
-    val shape = RoundedCornerShape(14.dp)
+    val cardBg = Color(0xFF222222)
+    val shape = RoundedCornerShape(10.dp)
 
     Surface(
         modifier = modifier.clickable(onClick = onClick),
         shape = shape,
         color = cardBg,
-        tonalElevation = 2.dp,
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.55f))
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 14.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start
         ) {
-            CompositionLocalProvider(LocalContentColor provides accent) {
-                icon()
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CompositionLocalProvider(LocalContentColor provides accent) {
+                    Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { icon() }
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
             }
-            Text(
-                text = title,
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
         }
     }
 }

@@ -8,6 +8,7 @@ import okhttp3.Request
 import com.squareup.moshi.Types
 import java.time.LocalDate
 import java.util.UUID
+import java.io.IOException
 
 class TodoRepository(
     private val store: ToDoStore,
@@ -54,7 +55,7 @@ class TodoRepository(
                 val body = resp.body?.string().orEmpty()
                 val debug = "url=${url}; status=${resp.code}; len=${body.length}; body=${body.take(200)}"
                 if (!resp.isSuccessful) {
-                    return@withContext FetchResult(emptyList(), debug)
+                    throw IOException("To-Do sync failed: HTTP ${resp.code}")
                 }
                 val adapter = Network.moshi.adapter<List<TodoRemoteItem>>(
                     Types.newParameterizedType(List::class.java, TodoRemoteItem::class.java)

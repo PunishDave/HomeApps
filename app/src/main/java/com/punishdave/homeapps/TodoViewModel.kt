@@ -7,6 +7,7 @@ import retrofit2.HttpException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -21,9 +22,9 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = TodoRepository(ToDoStore(app.applicationContext))
 
     val tasks = repo.tasksFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
-    val category = repo.categoryFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
-    val habit = repo.habitFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val category = repo.categoryFlow().stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val habit = repo.habitFlow().stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val categoryOptions = repo.categoryOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val habitOptions = repo.habitOptionsFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val newTaskText = MutableStateFlow("")
@@ -106,9 +107,9 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun syncFromApi() = viewModelScope.launch {
-        val key = accessKey.value.trim()
-        val cat = category.value.trim()
-        val hab = habit.value.trim()
+        val key = repo.accessKeyFlow().first().trim()
+        val cat = repo.categoryFlow().first().trim()
+        val hab = repo.habitFlow().first().trim()
         if (key.isEmpty()) {
             lastError.value = "Enter the access key first."
             lastSyncStatus.value = "Sync skipped: no access key."
@@ -148,12 +149,9 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 repo.saveHabit(habits.first())
             }
             lastError.value = null
-            val idsSaved = remoteLatestItems.joinToString(",") { it.id }
-            val idsInitial = remoteInitial.items.joinToString(",") { it.id }
-            val idsAfterPush = remoteAfterPush.items.joinToString(",") { it.id }
             val failedCount = pushed.failed.size
             val failedMsg = if (failedCount > 0) " (failed to push $failedCount)" else ""
-            lastSyncStatus.value = "Synced ${remoteLatestItems.size} items [saved ids: $idsSaved; initial: $idsInitial; after push: $idsAfterPush]; pushed ${pushed.created.size}$failedMsg; categories ${cats.size}; habits ${habits.size}; debug=${remoteInitial.debug} / ${remoteAfterPush.debug}"
+            lastSyncStatus.value = "Synced ${remoteLatestItems.size} tasks; pushed ${pushed.created.size}$failedMsg"
         } catch (e: Exception) {
             val msg = httpMessage(e, "Sync failed")
             lastError.value = msg

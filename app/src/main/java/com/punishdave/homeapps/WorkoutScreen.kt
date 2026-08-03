@@ -2,6 +2,11 @@
 
 package com.punishdave.homeapps
 
+import android.os.Build
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.decode.AnimatedImageDecoder
+import coil.decode.GifDecoder
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.padding
@@ -43,6 +49,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -52,21 +61,17 @@ private val WorkoutBg = Color(0xFF1C1C1C)
 private val WorkoutPanel = Color(0xFF0F0F0F)
 private val WorkoutAccent = Color(0xFFB00020)
 
-private enum class WorkoutTab { Log, Settings }
-
 @Composable
 fun WorkoutScreen(
     onBack: () -> Unit
 ) {
     val vm: WorkoutViewModel = viewModel()
     val lastErr by vm.lastError.collectAsState()
-    val accessKey by vm.accessKey.collectAsState()
     val lastSync by vm.lastSyncStatus.collectAsState()
     val days by vm.days.collectAsState()
     val selectedDayKey by vm.selectedDayKey.collectAsState()
     val selectedDayDetail by vm.selectedDayDetail.collectAsState()
     val latestEntries by vm.latestEntries.collectAsState()
-    var currentTab by rememberSaveable { mutableStateOf(WorkoutTab.Log) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = WorkoutBg) {
         Column(
@@ -94,46 +99,15 @@ fun WorkoutScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                WorkoutTabCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Log",
-                    subtitle = "Add & view sessions",
-                    selected = currentTab == WorkoutTab.Log,
-                    onClick = { currentTab = WorkoutTab.Log }
-                )
-                WorkoutTabCard(
-                    modifier = Modifier.weight(1f),
-                    title = "Settings",
-                    subtitle = "Access key & sync",
-                    selected = currentTab == WorkoutTab.Settings,
-                    onClick = { currentTab = WorkoutTab.Settings }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            when (currentTab) {
-                WorkoutTab.Log -> WorkoutLogSection(
-                    vm = vm,
-                    lastErr = lastErr,
-                    days = days,
-                    selectedDayKey = selectedDayKey,
-                    lastSyncStatus = lastSync,
-                    dayDetail = selectedDayDetail,
-                    latestEntries = latestEntries
-                )
-                WorkoutTab.Settings -> WorkoutSettingsSection(
-                    accessKey = accessKey,
-                    lastErr = lastErr,
-                    lastSync = lastSync,
-                    onAccessKeyChange = { vm.saveAccessKey(it) },
-                    onSync = { vm.syncFromApi() }
-                )
-            }
+            WorkoutLogSection(
+                vm = vm,
+                lastErr = lastErr,
+                days = days,
+                selectedDayKey = selectedDayKey,
+                lastSyncStatus = lastSync,
+                dayDetail = selectedDayDetail,
+                latestEntries = latestEntries
+            )
         }
     }
 }
@@ -150,6 +124,8 @@ private fun WorkoutLogSection(
 ) {
     val selectedDay = days.firstOrNull { it.day_key == selectedDayKey }
     val activeDay = dayDetail ?: selectedDay
+    val stretches = activeDay?.workouts.orEmpty().filter { it.type.equals("stretch", ignoreCase = true) }
+    val exercises = activeDay?.workouts.orEmpty().filterNot { it.type.equals("stretch", ignoreCase = true) }
 
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -233,18 +209,73 @@ private fun WorkoutLogSection(
         if (activeDay == null || activeDay.workouts.isEmpty()) {
             item {
                 Text(
-                    text = "No workouts loaded for this day yet. Hit Sync in Settings to fetch days.",
+                    text = "No workouts loaded for this day yet. Pull down on Home to refresh.",
                     color = Color(0xFFB0B0B0),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
         } else {
-            items(activeDay.workouts, key = { it.name }) { move ->
+            items(exercises, key = { "exercise-${it.name}" }) { move ->
                 val latestForMove = latestEntries.firstOrNull { it.workout.equals(move.name, ignoreCase = true) }
                 WorkoutMoveCard(
                     move = move,
                     latest = latestForMove,
                     onAdd = { weight -> vm.addEntryForMove(move, weight, activeDay.day_key) }
+                )
+            }
+            if (stretches.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Stretches",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                items(stretches, key = { "stretch-${it.name}" }) { stretch ->
+                    StretchCard(stretch)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StretchCard(stretch: WorkoutMove) {
+    val context = LocalContext.current
+    val imageLoader = remember(context) {
+        ImageLoader.Builder(context)
+            .components {
+                if (Build.VERSION.SDK_INT >= 28) add(AnimatedImageDecoder.Factory())
+                else add(GifDecoder.Factory())
+            }
+            .build()
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = WorkoutPanel,
+        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stretch.name, color = Color.White, fontWeight = FontWeight.Bold)
+                stretch.duration_seconds?.takeIf { it > 0 }?.let {
+                    Text("${it}s", color = WorkoutAccent, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            stretch.media_url?.takeIf { it.isNotBlank() }?.let { mediaUrl ->
+                AsyncImage(
+                    model = mediaUrl,
+                    imageLoader = imageLoader,
+                    contentDescription = "Demonstration of ${stretch.name}",
+                    modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
                 )
             }
         }
@@ -356,89 +387,6 @@ private fun WorkoutMoveCard(
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = "Add entry")
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WorkoutSettingsSection(
-    accessKey: String,
-    lastErr: String?,
-    lastSync: String?,
-    onAccessKeyChange: (String) -> Unit,
-    onSync: () -> Unit
-) {
-    var accessKeyInput by rememberSaveable { mutableStateOf(accessKey) }
-
-    LaunchedEffect(accessKey) { accessKeyInput = accessKey }
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        shape = RoundedCornerShape(12.dp),
-        color = WorkoutPanel,
-        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.4f)),
-        tonalElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "Sync & API",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = accessKeyInput,
-                onValueChange = {
-                    accessKeyInput = it
-                    onAccessKeyChange(it)
-                },
-                singleLine = true,
-                label = { Text("Access key") }
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                FilledIconButton(
-                    onClick = onSync,
-                    colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-                        containerColor = WorkoutAccent,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(Icons.Filled.Sync, contentDescription = "Sync")
-                }
-            }
-
-            lastErr?.let {
-                Text(
-                    text = it,
-                    color = Color(0xFFFF9B9B),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            if (!lastSync.isNullOrBlank()) {
-                Text(
-                    text = lastSync,
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            } else {
-                Text(
-                    text = "Not synced yet. Enter the access key and press Sync.",
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
     }

@@ -58,7 +58,6 @@ fun MealPlannerMenuScreen(
     val vm: MealPlannerViewModel = viewModel()
     val syncing by vm.isSyncing.collectAsState()
     val lastErr by vm.lastError.collectAsState()
-    val accessKey by vm.accessKey.collectAsState()
 
     Surface(modifier = Modifier.fillMaxSize(), color = Bg) {
         Column(
@@ -117,28 +116,6 @@ fun MealPlannerMenuScreen(
                     )
                 }
             }
-
-            OutlinedTextField(
-                value = accessKey,
-                onValueChange = { vm.saveAccessKey(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                label = { Text("Meal planner access key") },
-                placeholder = { Text("Required to save weeks and shopping lists") },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Accent,
-                    unfocusedBorderColor = Accent.copy(alpha = 0.6f),
-                    focusedLabelColor = Accent,
-                    unfocusedLabelColor = Color(0xFFB0B0B0),
-                    cursorColor = Accent,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    focusedPlaceholderColor = Color(0xFF8A8A8A),
-                    unfocusedPlaceholderColor = Color(0xFF8A8A8A)
-                )
-            )
 
             // Status / error line (small + unobtrusive)
             if (syncing) {
@@ -346,7 +323,6 @@ fun MealPlannerShoppingListScreen(
     val syncing by vm.isSyncing.collectAsState()
     val lastErr by vm.lastError.collectAsState()
     val syncStatus by vm.shoppingSyncStatus.collectAsState()
-    val accessKey by vm.accessKey.collectAsState()
 
     val weekStart = listState?.week_start ?: vm.shoppingWeekStart()
     val weekLabel = remember(weekStart) {
@@ -415,25 +391,6 @@ fun MealPlannerShoppingListScreen(
                         }
                     }
 
-                    OutlinedTextField(
-                        value = accessKey,
-                        onValueChange = { vm.saveAccessKey(it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Access key") },
-                        placeholder = { Text("Needed to push changes") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Accent,
-                            unfocusedBorderColor = Accent.copy(alpha = 0.6f),
-                            focusedLabelColor = Accent,
-                            unfocusedLabelColor = Color(0xFFB0B0B0),
-                            cursorColor = Accent,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedPlaceholderColor = Color(0xFF8A8A8A),
-                            unfocusedPlaceholderColor = Color(0xFF8A8A8A)
-                        )
-                    )
                 }
             }
 

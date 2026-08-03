@@ -27,7 +27,7 @@ class WorkoutViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = WorkoutRepository(WorkoutStore(app.applicationContext))
 
     val entries = repo.entriesFlow().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val accessKey = repo.accessKeyFlow().stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val days = repo.daysFlow().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val selectedDayKey = MutableStateFlow<String?>(null)
     val selectedDayDetail = MutableStateFlow<WorkoutDay?>(null)
