@@ -58,8 +58,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
 
 private val WorkoutBg = Color(0xFF1C1C1C)
-private val WorkoutPanel = Color(0xFF0F0F0F)
-private val WorkoutAccent = Color(0xFFB00020)
+private val WorkoutPanel = Color(0xFF242424)
+private val WorkoutAccent = Color(0xFFE66A64)
 
 @Composable
 fun WorkoutScreen(
@@ -78,8 +78,7 @@ fun WorkoutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .padding(top = 16.dp)
+                .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -91,9 +90,9 @@ fun WorkoutScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Workout Log",
-                    color = WorkoutAccent,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.ExtraBold
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -165,8 +164,7 @@ private fun WorkoutLogSection(
                     val isSelected = day.day_key == selectedDayKey
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) WorkoutAccent else WorkoutPanel,
-                        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.5f)),
+                        color = if (isSelected) WorkoutAccent.copy(alpha = 0.3f) else WorkoutPanel,
                         onClick = { vm.selectDay(day.day_key) }
                     ) {
                         Text(
@@ -255,9 +253,9 @@ private fun StretchCard(stretch: WorkoutMove) {
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(8.dp),
         color = WorkoutPanel,
-        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.35f))
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -292,9 +290,9 @@ private fun WorkoutMoveCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(8.dp),
         color = WorkoutPanel,
-        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.35f))
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -400,9 +398,9 @@ private fun WorkoutRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(8.dp),
         color = WorkoutPanel,
-        border = BorderStroke(1.dp, WorkoutAccent.copy(alpha = 0.35f))
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier

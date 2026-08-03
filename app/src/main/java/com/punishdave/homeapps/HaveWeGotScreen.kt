@@ -24,6 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -59,10 +63,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
 private val HwgBg = Color(0xFF1C1C1C)
-private val HwgPanel = Color(0xFF0F0F0F)
-private val HwgAccent = Color(0xFFB00020)
+private val HwgPanel = Color(0xFF242424)
+private val HwgAccent = Color(0xFFE66A64)
 
 @Composable
+@OptIn(ExperimentalMaterialApi::class)
 fun HaveWeGotScreen(
     onBack: () -> Unit
 ) {
@@ -75,15 +80,18 @@ fun HaveWeGotScreen(
     val status by vm.statusFilter.collectAsState()
     val search by vm.search.collectAsState()
     var filtersExpanded by remember { mutableStateOf(true) }
+    val pullRefreshState = rememberPullRefreshState(isLoading, onRefresh = { vm.refresh() })
 
     Surface(modifier = Modifier.fillMaxSize(), color = HwgBg) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .padding(top = 16.dp)
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
+            ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -96,13 +104,10 @@ fun HaveWeGotScreen(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "Have We Got",
-                        color = HwgAccent,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.ExtraBold
+                        color = Color.White,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
                     )
-                }
-                IconButton(onClick = { vm.refresh() }) {
-                    Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = Color.White)
                 }
             }
 
@@ -148,6 +153,14 @@ fun HaveWeGotScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             ItemList(items = items)
+            }
+            PullRefreshIndicator(
+                refreshing = isLoading,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                backgroundColor = HwgPanel,
+                contentColor = HwgAccent
+            )
         }
     }
 }
@@ -159,11 +172,11 @@ private fun SummarySection(summary: HaveWeGotSummary) {
 
     LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        item { StatCard(label = "Total", value = summary.total, modifier = Modifier.width(170.dp)) }
-        item { StatCard(label = "Films", value = films, modifier = Modifier.width(170.dp)) }
-        item { StatCard(label = "TV Shows", value = tv, modifier = Modifier.width(170.dp)) }
+        item { StatCard(label = "Total", value = summary.total, modifier = Modifier.width(112.dp)) }
+        item { StatCard(label = "Films", value = films, modifier = Modifier.width(112.dp)) }
+        item { StatCard(label = "TV Shows", value = tv, modifier = Modifier.width(112.dp)) }
     }
 }
 
@@ -171,20 +184,19 @@ private fun SummarySection(summary: HaveWeGotSummary) {
 private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(8.dp),
         color = HwgPanel,
-        tonalElevation = 3.dp,
-        border = BorderStroke(1.dp, HwgAccent.copy(alpha = 0.45f))
+        tonalElevation = 0.dp
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(text = label, color = Color(0xFFBDBDBD), fontWeight = FontWeight.Medium)
             Text(
                 text = value.toString(),
                 color = Color.White,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
         }
@@ -211,9 +223,8 @@ private fun FiltersCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = HwgPanel,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, HwgAccent.copy(alpha = 0.35f)),
-        tonalElevation = 2.dp,
+        shape = RoundedCornerShape(8.dp),
+        tonalElevation = 0.dp,
         onClick = onToggle
     ) {
         Column(
@@ -351,38 +362,38 @@ private fun ItemList(items: List<HaveWeGotItem>) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         items(items) { item ->
             ItemCard(item)
+            androidx.compose.material3.Divider(
+                modifier = Modifier.padding(start = 12.dp),
+                color = Color(0xFF363636)
+            )
         }
     }
 }
 
 @Composable
 private fun ItemCard(item: HaveWeGotItem) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = HwgPanel,
-        border = BorderStroke(1.dp, HwgAccent.copy(alpha = 0.45f))
-    ) {
+    Surface(modifier = Modifier.fillMaxWidth(), color = Color.Transparent) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Text(
                 text = item.name,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text(item.item_type.uppercase()) })
-                AssistChip(onClick = {}, label = { Text(item.status) })
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(item.item_type.uppercase(), color = HwgAccent, style = MaterialTheme.typography.labelSmall)
+                Text("•", color = Color(0xFF666666), style = MaterialTheme.typography.labelSmall)
+                Text(item.status, color = Color(0xFFAAAAAA), style = MaterialTheme.typography.labelSmall)
             }
 
             val lastAccess = item.last_access ?: "Unknown"

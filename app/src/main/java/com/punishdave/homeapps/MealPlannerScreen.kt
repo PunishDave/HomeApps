@@ -35,9 +35,9 @@ import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
-private val Bg = Color(0xFF2A2A2A)
-private val Accent = Color(0xFFB00020)
-private val PanelBg = Color(0xFF0F0F0F)
+private val Bg = Color(0xFF1C1C1C)
+private val Accent = Color(0xFFE66A64)
+private val PanelBg = Color(0xFF242424)
 
 private fun startOfWeek(date: LocalDate, startDay: DayOfWeek): LocalDate =
     date.with(TemporalAdjusters.previousOrSame(startDay))
@@ -64,16 +64,9 @@ fun MealPlannerMenuScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .padding(top = 16.dp)
+                .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
-            Text(
-                text = "Meal Planner",
-                color = Accent,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+            TopTitleWithBack(title = "Meal Planner", onBack = onBack)
 
             Spacer(modifier = Modifier.height(18.dp))
 
@@ -86,7 +79,7 @@ fun MealPlannerMenuScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     ActionCard(
                         title = "Current Week",
@@ -136,8 +129,7 @@ fun MealPlannerMenuScreen(
                 )
             }
 
-            BottomBarBackSync(
-                onBack = onBack,
+            BottomBarSync(
                 // notify caller and also trigger the actual sync in the VM
                 onSync = {
                     onSync()
@@ -149,20 +141,14 @@ fun MealPlannerMenuScreen(
 }
 
 @Composable
-private fun BottomBarBackSync(onBack: () -> Unit, onSync: () -> Unit) {
+private fun BottomBarSync(onSync: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TextButton(onClick = onBack) {
-            Icon(Icons.Filled.ArrowBack, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Back")
-        }
-
         TextButton(onClick = onSync) {
             Text("Sync")
             Spacer(modifier = Modifier.width(8.dp))
@@ -179,18 +165,17 @@ private fun ActionCard(
     modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = modifier.heightIn(min = 92.dp),
-        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.heightIn(min = 70.dp),
+        shape = RoundedCornerShape(8.dp),
         color = PanelBg,
-        tonalElevation = 2.dp,
-        border = BorderStroke(1.dp, Accent.copy(alpha = 0.55f)),
+        tonalElevation = 0.dp,
         onClick = onClick
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            Text(text = title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(text = title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text(
                 text = subtitle,
                 color = Color(0xFFB0B0B0),
@@ -223,8 +208,7 @@ fun MealPlannerCurrentWeekScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .padding(top = 16.dp)
+                .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             TopTitleWithBack(title = "Current Week", onBack = onBack)
 
@@ -259,9 +243,8 @@ private fun CurrentWeekDayCard(
     mealTitle: String?
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFEFEFEF),
-        border = BorderStroke(1.dp, Accent.copy(alpha = 0.45f))
+        shape = RoundedCornerShape(8.dp),
+        color = PanelBg
     ) {
         Column {
             Surface(color = Color(0xFF2F2F2F)) {
@@ -295,7 +278,7 @@ private fun CurrentWeekDayCard(
                 ) {
                     Text(
                         text = mealTitle ?: "—",
-                        color = Color(0xFF111111),
+                        color = Color.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 3,
@@ -335,8 +318,7 @@ fun MealPlannerShoppingListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .padding(top = 16.dp),
+                .padding(horizontal = 18.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TopTitleWithBack(title = "Shopping List", onBack = onBack)
@@ -345,8 +327,7 @@ fun MealPlannerShoppingListScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 color = PanelBg,
-                tonalElevation = 2.dp,
-                border = BorderStroke(1.dp, Accent.copy(alpha = 0.45f))
+                tonalElevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),
@@ -441,8 +422,7 @@ fun MealPlannerShoppingListScreen(
                     .weight(1f),
                 shape = RoundedCornerShape(12.dp),
                 color = PanelBg,
-                tonalElevation = 2.dp,
-                border = BorderStroke(1.dp, Accent.copy(alpha = 0.35f))
+                tonalElevation = 0.dp
             ) {
                 if (items.isEmpty()) {
                     Box(
@@ -570,8 +550,7 @@ fun MealPlannerPlanWeekScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 20.dp)
-                .padding(top = 16.dp)
+                .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             TopTitleWithBack(title = "Plan a week", onBack = onBack)
 
@@ -663,9 +642,8 @@ private fun PlanWeekDayCard(
     val selectedTitle = options.firstOrNull { it.id == selectedRecipeId }?.title ?: options.first().title
 
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = bodyBg,
-        border = BorderStroke(1.dp, Accent.copy(alpha = 0.45f))
+        shape = RoundedCornerShape(8.dp),
+        color = bodyBg
     ) {
         Column {
             Surface(color = headerBg) {
@@ -794,9 +772,9 @@ private fun TopTitleWithBack(title: String, onBack: () -> Unit) {
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = title,
-            color = Accent,
+            color = Color.White,
             fontSize = 24.sp,
-            fontWeight = FontWeight.ExtraBold
+            fontWeight = FontWeight.Bold
         )
     }
 }

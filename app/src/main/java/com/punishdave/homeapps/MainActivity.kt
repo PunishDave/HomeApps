@@ -86,7 +86,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            MaterialTheme(
+                colorScheme = darkColorScheme(
+                    primary = Color(0xFFE66A64),
+                    onPrimary = Color(0xFF1C1C1C),
+                    secondary = Color(0xFFE66A64),
+                    background = Color(0xFF1C1C1C),
+                    surface = Color(0xFF242424),
+                    surfaceVariant = Color(0xFF2B2B2B),
+                    outline = Color(0xFF4A4A4A)
+                )
+            ) {
                 val navController = rememberNavController()
 
                 NavHost(
