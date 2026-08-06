@@ -12,14 +12,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -43,15 +47,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private val GwdBackground = Color(0xFF1C1C1C)
 private val GwdPanel = Color(0xFF242424)
+private val GwdPanelSoft = Color(0xFF202020)
+private val GwdBorder = Color(0xFF383838)
+private val GwdMuted = Color(0xFF999999)
 private val GwdAccent = Color(0xFFE66A64)
+private val GwdPositive = Color(0xFF7DB68A)
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -68,67 +81,192 @@ fun GameWithDaveScreen(onBack: () -> Unit) {
             LazyColumn(
                 Modifier.fillMaxSize().statusBarsPadding(),
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFFBDBDBD))
-                        }
-                        Spacer(Modifier.width(4.dp))
-                        Column {
-                            Text("GameWithDave", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                            Text("Pull down to refresh", color = Color(0xFF8D8D8D), style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
+                item { GameWithDaveHeader(onBack) }
                 if (loading) item { LinearProgressIndicator(Modifier.fillMaxWidth(), color = GwdAccent) }
-                message?.let { item { Text(it, color = if (it.contains("fail", true) || it.contains("unable", true)) Color(0xFFFFB3B3) else Color(0xFF9AD6A3)) } }
+                message?.let { item { StatusMessage(it) } }
+
                 if (accessKey.isBlank()) {
                     item { EmptyPanel("Add the GameWithDave access key in Settings before refreshing.") }
                 } else {
+                    item { CompactCalendar(dashboard.days) }
+                    item { SectionLabel("UPDATE", "Your availability") }
                     item { AvailabilityEditor(dashboard.users, loading, vm::saveAvailability) }
-                    item {
-                        Text("Upcoming activity", color = GwdAccent, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    item { SectionLabel("ADMIN", "Upcoming game nights") }
+                    if (!loading && dashboard.days.none { it.game_nights.isNotEmpty() }) {
+                        item { EmptyPanel("No upcoming game nights yet.") }
                     }
-                    if (!loading && dashboard.days.isEmpty()) item { EmptyPanel("No upcoming availability or game nights yet.") }
-                    items(dashboard.days, key = { it.date }) { day ->
-                        GameDayPanel(day, loading, vm::updateNight)
-                    }
+                    items(
+                        dashboard.days.filter { it.game_nights.isNotEmpty() },
+                        key = { it.date }
+                    ) { day -> AdminDayRow(day, loading, vm::updateNight) }
                 }
                 item { Spacer(Modifier.height(24.dp)) }
             }
-            PullRefreshIndicator(loading, pullRefresh, Modifier.align(Alignment.TopCenter).statusBarsPadding(), GwdPanel, GwdAccent)
+            PullRefreshIndicator(
+                loading,
+                pullRefresh,
+                Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                GwdPanel,
+                GwdAccent
+            )
         }
     }
 }
 
 @Composable
-private fun AvailabilityEditor(
-    users: List<GameWithDaveUser>,
-    loading: Boolean,
-    onSave: (String, String, String, String) -> Unit
-) {
+private fun GameWithDaveHeader(onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = Color(0xFFBDBDBD))
+        }
+        Spacer(Modifier.width(4.dp))
+        Column {
+            Text("GameWithDave", color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Availability and game nights", color = GwdMuted, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
+@Composable
+private fun CompactCalendar(days: List<GameWithDaveDay>) {
+    val datedDays = remember(days) { days.mapNotNull { day -> runCatching { LocalDate.parse(day.date) }.getOrNull()?.let { it to day } }.toMap() }
+    val firstAvailableMonth = datedDays.keys.minOrNull()?.let(YearMonth::from)
+    var month by remember(firstAvailableMonth) { mutableStateOf(firstAvailableMonth ?: YearMonth.now()) }
+    val firstDayOffset = month.atDay(1).dayOfWeek.value - 1
+    val cells = List(firstDayOffset) { null } + (1..month.lengthOfMonth()).map(month::atDay)
+    val paddedCells = cells + List((7 - cells.size % 7) % 7) { null }
+
+    Surface(color = GwdPanel, shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, GwdBorder)) {
+        Column {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = { month = month.minusMonths(1) }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.ChevronLeft, "Previous month", tint = GwdMuted)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        month.format(DateTimeFormatter.ofPattern("MMMM", Locale.UK)),
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(month.year.toString(), color = GwdMuted, style = MaterialTheme.typography.labelSmall)
+                }
+                IconButton(onClick = { month = month.plusMonths(1) }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.ChevronRight, "Next month", tint = GwdMuted)
+                }
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                listOf("M", "T", "W", "T", "F", "S", "S").forEach {
+                    Text(it, Modifier.weight(1f).padding(vertical = 5.dp), color = GwdMuted, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            paddedCells.chunked(7).forEach { week ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+                    week.forEach { date -> CalendarDay(date, date?.let(datedDays::get), Modifier.weight(1f)) }
+                }
+            }
+            CalendarLegend(Modifier.padding(horizontal = 14.dp, vertical = 11.dp))
+        }
+    }
+}
+
+@Composable
+private fun CalendarDay(date: LocalDate?, day: GameWithDaveDay?, modifier: Modifier = Modifier) {
+    val today = date == LocalDate.now()
+    val hasGame = day?.game_nights?.any { it.status != "removed" } == true
+    Column(
+        modifier.height(48.dp).padding(2.dp).clip(RoundedCornerShape(9.dp)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        if (date != null) {
+            Surface(
+                color = if (today) GwdAccent else Color.Transparent,
+                shape = CircleShape,
+                border = if (hasGame && !today) BorderStroke(1.dp, GwdAccent) else null
+            ) {
+                Text(
+                    date.dayOfMonth.toString(),
+                    Modifier.size(27.dp).padding(top = 5.dp),
+                    color = if (today) Color.White else if (date.isBefore(LocalDate.now())) Color(0xFF666666) else Color(0xFFE2E2E2),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (today || hasGame) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                day?.availability?.take(4)?.forEach { availability ->
+                    Box(Modifier.size(4.dp).clip(CircleShape).then(Modifier), contentAlignment = Alignment.Center) {
+                        Surface(
+                            Modifier.fillMaxSize(),
+                            color = when (availability.status) {
+                                "yes" -> GwdPositive
+                                "tentative" -> Color(0xFFD6A85C)
+                                else -> Color(0xFF656565)
+                            },
+                            shape = CircleShape
+                        ) {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarLegend(modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        LegendItem(GwdAccent, "Game night")
+        LegendItem(GwdPositive, "Available")
+        LegendItem(Color(0xFFD6A85C), "Tentative")
+    }
+}
+
+@Composable
+private fun LegendItem(color: Color, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Surface(Modifier.size(6.dp), shape = CircleShape, color = color) {}
+        Text(label, color = GwdMuted, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun SectionLabel(eyebrow: String, title: String) {
+    Column(Modifier.padding(top = 4.dp)) {
+        Text(eyebrow, color = GwdAccent, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        Text(title, color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun AvailabilityEditor(users: List<GameWithDaveUser>, loading: Boolean, onSave: (String, String, String, String) -> Unit) {
     var user by remember(users) { mutableStateOf(users.firstOrNull()?.role.orEmpty()) }
     var status by remember { mutableStateOf("yes") }
     var startDate by remember { mutableStateOf(LocalDate.now().toString()) }
     var endDate by remember { mutableStateOf(LocalDate.now().toString()) }
 
-    Surface(color = GwdPanel, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF3A3A3A))) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Set availability", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            ChoiceField("Member", user, users.map { it.role }) { user = it }
-            ChoiceField("Status", status, listOf("yes", "tentative", "no")) { status = it }
+    Surface(color = GwdPanelSoft, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, GwdBorder)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(startDate, { startDate = it }, Modifier.weight(1f), label = { Text("Start YYYY-MM-DD") }, singleLine = true)
-                OutlinedTextField(endDate, { endDate = it }, Modifier.weight(1f), label = { Text("End YYYY-MM-DD") }, singleLine = true)
+                Box(Modifier.weight(1f)) { ChoiceField("Member", user, users.map { it.role }) { user = it } }
+                Box(Modifier.weight(1f)) { ChoiceField("Status", status, listOf("yes", "tentative", "no")) { status = it } }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(startDate, { startDate = it }, Modifier.weight(1f), label = { Text("From") }, placeholder = { Text("YYYY-MM-DD") }, singleLine = true)
+                OutlinedTextField(endDate, { endDate = it }, Modifier.weight(1f), label = { Text("To") }, placeholder = { Text("YYYY-MM-DD") }, singleLine = true)
             }
             Button(
                 onClick = { onSave(user, startDate, endDate, status) },
                 enabled = !loading && user.isNotBlank() && validDate(startDate) && validDate(endDate),
                 modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GwdAccent)
-            ) { Text("Save availability") }
+            ) { Text("Update availability") }
         }
     }
 }
@@ -147,38 +285,30 @@ private fun ChoiceField(label: String, value: String, options: List<String>, onS
         )
         DropdownMenu(expanded, { expanded = false }) {
             options.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.replaceFirstChar { it.uppercase() }) },
-                    onClick = { onSelect(option); expanded = false }
-                )
+                DropdownMenuItem(text = { Text(option.replaceFirstChar { it.uppercase() }) }, onClick = { onSelect(option); expanded = false })
             }
         }
     }
 }
 
 @Composable
-private fun GameDayPanel(day: GameWithDaveDay, loading: Boolean, onUpdate: (GameWithDaveNight, String) -> Unit) {
-    Surface(color = GwdPanel, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF353535))) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(day.display_date, color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            if (day.availability.isNotEmpty()) {
-                Text(
-                    day.availability.joinToString("  ") { "${it.initials} ${it.status}" },
-                    color = Color(0xFFBDBDBD),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
+private fun AdminDayRow(day: GameWithDaveDay, loading: Boolean, onUpdate: (GameWithDaveNight, String) -> Unit) {
+    Surface(color = GwdPanelSoft, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, GwdBorder)) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(day.display_date, color = GwdMuted, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
             day.game_nights.forEach { night ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(7.dp).clip(CircleShape)) { Surface(Modifier.fillMaxSize(), color = GwdAccent) {} }
+                    Spacer(Modifier.width(9.dp))
                     Column(Modifier.weight(1f)) {
                         Text(night.team_label, color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Text(night.status.replaceFirstChar { it.uppercase() }, color = GwdAccent, style = MaterialTheme.typography.labelMedium)
+                        Text(night.status.replaceFirstChar { it.uppercase() }, color = GwdAccent, style = MaterialTheme.typography.labelSmall)
                     }
                     if (night.status != "locked") {
-                        OutlinedButton(onClick = { onUpdate(night, "lock") }, enabled = !loading) { Text("Lock") }
+                        OutlinedButton(onClick = { onUpdate(night, "lock") }, enabled = !loading, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("Lock") }
+                        Spacer(Modifier.width(6.dp))
                     }
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedButton(onClick = { onUpdate(night, "remove") }, enabled = !loading && night.status != "removed") { Text("Remove") }
+                    OutlinedButton(onClick = { onUpdate(night, "remove") }, enabled = !loading && night.status != "removed", contentPadding = PaddingValues(horizontal = 10.dp)) { Text("Remove") }
                 }
             }
         }
@@ -186,8 +316,16 @@ private fun GameDayPanel(day: GameWithDaveDay, loading: Boolean, onUpdate: (Game
 }
 
 @Composable
+private fun StatusMessage(text: String) {
+    val error = text.contains("fail", true) || text.contains("unable", true) || text.contains("error", true)
+    Surface(color = if (error) Color(0xFF3A2424) else Color(0xFF203126), shape = RoundedCornerShape(10.dp)) {
+        Text(text, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp), color = if (error) Color(0xFFFFB3B3) else Color(0xFF9AD6A3), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
 private fun EmptyPanel(text: String) {
-    Surface(color = GwdPanel, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF353535))) {
+    Surface(color = GwdPanel, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, GwdBorder)) {
         Text(text, Modifier.fillMaxWidth().padding(22.dp), color = Color(0xFFBDBDBD))
     }
 }
