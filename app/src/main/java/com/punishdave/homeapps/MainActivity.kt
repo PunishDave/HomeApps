@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -69,6 +70,7 @@ private sealed class Route(val id: String) {
     data object HaveWeGot : Route("have_we_got")
     data object Todo : Route("todo")
     data object WorkoutLog : Route("workout_log")
+    data object GameWithDave : Route("gamewithdave")
     data object Transmission : Route("transmission")
     data object Wallfacer : Route("wallfacer")
     data object Sophon : Route("sophon")
@@ -109,6 +111,7 @@ class MainActivity : ComponentActivity() {
                             onOpenHaveWeGot = { navController.navigate(Route.HaveWeGot.id) },
                             onOpenTodo = { navController.navigate(Route.Todo.id) },
                             onOpenWorkoutLog = { navController.navigate(Route.WorkoutLog.id) },
+                            onOpenGameWithDave = { navController.navigate(Route.GameWithDave.id) },
                             onOpenTransmission = { navController.navigate(Route.Transmission.id) },
                             onOpenWallfacer = { navController.navigate(Route.Wallfacer.id) },
                             onOpenSophon = { navController.navigate(Route.Sophon.id) },
@@ -162,6 +165,9 @@ class MainActivity : ComponentActivity() {
                             onBack = { navController.popBackStack() }
                         )
                     }
+                    composable(Route.GameWithDave.id) {
+                        GameWithDaveScreen(onBack = { navController.popBackStack() })
+                    }
                     composable(Route.Transmission.id) {
                         val settingsVm: AppSettingsViewModel = viewModel()
                         val username by settingsVm.transmissionUsername.collectAsState()
@@ -214,6 +220,7 @@ fun HomeAppsScreen(
     onOpenHaveWeGot: () -> Unit,
     onOpenTodo: () -> Unit,
     onOpenWorkoutLog: () -> Unit,
+    onOpenGameWithDave: () -> Unit,
     onOpenTransmission: () -> Unit,
     onOpenWallfacer: () -> Unit,
     onOpenSophon: () -> Unit,
@@ -223,6 +230,7 @@ fun HomeAppsScreen(
     val mealVm: MealPlannerViewModel = viewModel()
     val haveVm: HaveWeGotViewModel = viewModel()
     val todoVm: TodoViewModel = viewModel()
+    val gameWithDaveVm: GameWithDaveViewModel = viewModel()
 
     val bg = Color(0xFF1C1C1C)
     val accent = Color(0xFFE66A64)
@@ -239,6 +247,7 @@ fun HomeAppsScreen(
                     jobs += mealVm.sync()
                     jobs += haveVm.refresh()
                     jobs += todoVm.syncFromApi()
+                    jobs += gameWithDaveVm.refresh()
                     jobs.joinAll()
                     syncAllMsg = "Up to date"
                 } catch (_: Exception) {
@@ -271,6 +280,11 @@ fun HomeAppsScreen(
             title = "Workout Log",
             icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = onOpenWorkoutLog
+        ),
+        HomeCard(
+            title = "GameWithDave",
+            icon = { Icon(Icons.Filled.EventAvailable, contentDescription = null, modifier = Modifier.size(24.dp)) },
+            onClick = onOpenGameWithDave
         ),
         HomeCard(
             title = "Transmission",

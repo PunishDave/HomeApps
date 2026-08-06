@@ -33,6 +33,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val mealStore = MealPlannerStore(context)
     private val todoStore = ToDoStore(context)
     private val workoutStore = WorkoutStore(context)
+    private val gameWithDaveStore = GameWithDaveStore(context)
 
     private val transmissionUserKey = stringPreferencesKey("transmission_username")
     private val transmissionPasswordKey = stringPreferencesKey("transmission_password")
@@ -43,6 +44,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
     val todoCategory = todoStore.categoryFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val todoHabit = todoStore.habitFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val workoutKey = workoutStore.accessKeyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val gameWithDaveKey = gameWithDaveStore.accessKeyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val transmissionUsername = context.webSettingsDataStore.data
         .map { it[transmissionUserKey] ?: "" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
@@ -62,6 +64,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         todoCategory: String,
         todoHabit: String,
         workoutKey: String,
+        gameWithDaveKey: String,
         sophonUrl: String,
         transmissionUsername: String,
         transmissionPassword: String
@@ -71,6 +74,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         todoStore.saveCategory(todoCategory.trim())
         todoStore.saveHabit(todoHabit.trim())
         workoutStore.saveAccessKey(workoutKey.trim())
+        gameWithDaveStore.saveAccessKey(gameWithDaveKey.trim())
         context.webSettingsDataStore.edit {
             it[sophonUrlKey] = sophonUrl.trim().ifBlank { "http://192.168.0.234:8096" }
             it[transmissionUserKey] = transmissionUsername.trim()
@@ -88,6 +92,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val storedTodoCategory by vm.todoCategory.collectAsState()
     val storedTodoHabit by vm.todoHabit.collectAsState()
     val storedWorkoutKey by vm.workoutKey.collectAsState()
+    val storedGameWithDaveKey by vm.gameWithDaveKey.collectAsState()
     val storedTransmissionUsername by vm.transmissionUsername.collectAsState()
     val storedTransmissionPassword by vm.transmissionPassword.collectAsState()
     val storedSophonUrl by vm.sophonUrl.collectAsState()
@@ -97,6 +102,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     var todoCategory by rememberSaveable(storedTodoCategory) { mutableStateOf(storedTodoCategory) }
     var todoHabit by rememberSaveable(storedTodoHabit) { mutableStateOf(storedTodoHabit) }
     var workoutKey by rememberSaveable(storedWorkoutKey) { mutableStateOf(storedWorkoutKey) }
+    var gameWithDaveKey by rememberSaveable(storedGameWithDaveKey) { mutableStateOf(storedGameWithDaveKey) }
     var sophonUrl by rememberSaveable(storedSophonUrl) { mutableStateOf(storedSophonUrl) }
     var transmissionUsername by rememberSaveable(storedTransmissionUsername) { mutableStateOf(storedTransmissionUsername) }
     var transmissionPassword by rememberSaveable(storedTransmissionPassword) { mutableStateOf(storedTransmissionPassword) }
@@ -121,6 +127,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 item { SettingsField("To-Do default category", todoCategory) { todoCategory = it } }
                 item { SettingsField("To-Do default habit", todoHabit) { todoHabit = it } }
                 item { SettingsField("Workout access key", workoutKey) { workoutKey = it } }
+                item { SettingsField("GameWithDave access key", gameWithDaveKey) { gameWithDaveKey = it } }
                 item { Spacer(Modifier.height(6.dp)); SettingsHeading("Home services") }
                 item { SettingsField("Sophon URL", sophonUrl) { sophonUrl = it } }
                 item { Spacer(Modifier.height(6.dp)); SettingsHeading("Transmission") }
@@ -138,7 +145,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 item {
                     Button(
                         onClick = {
-                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, sophonUrl, transmissionUsername, transmissionPassword)
+                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, gameWithDaveKey, sophonUrl, transmissionUsername, transmissionPassword)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE66A64))

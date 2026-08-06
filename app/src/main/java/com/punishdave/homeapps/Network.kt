@@ -50,6 +50,13 @@ object Network {
         .build()
         .create(WorkoutApi::class.java)
 
+    val gameWithDaveApi: GameWithDaveApi = Retrofit.Builder()
+        .baseUrl("https://punishdave.com/index.php/wp-json/gamewithdave/v1/")
+        .addConverterFactory(MoshiConverterFactory.create(moshi))
+        .client(client)
+        .build()
+        .create(GameWithDaveApi::class.java)
+
     // DataStore JSON adapters
     val weekAdapter = moshi.adapter(WeekResponse::class.java)
     val shoppingListAdapter = moshi.adapter(ShoppingListResponse::class.java)
