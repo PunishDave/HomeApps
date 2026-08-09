@@ -48,6 +48,10 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val sophonUrlKey = stringPreferencesKey("sophon_url")
     private val notificationsKey = booleanPreferencesKey("notifications_enabled")
     private val biometricKey = booleanPreferencesKey("biometric_settings_enabled")
+    private val gameNotificationsKey = booleanPreferencesKey("game_notifications_enabled")
+    private val temperatureNotificationsKey = booleanPreferencesKey("temperature_notifications_enabled")
+    private val lowTemperatureKey = stringPreferencesKey("temperature_low_threshold")
+    private val highTemperatureKey = stringPreferencesKey("temperature_high_threshold")
 
     val mealKey = mealStore.accessKeyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val todoKey = todoStore.accessKeyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
@@ -72,6 +76,18 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
     val biometricEnabled = context.webSettingsDataStore.data
         .map { it[biometricKey] ?: false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val gameNotificationsEnabled = context.webSettingsDataStore.data
+        .map { it[gameNotificationsKey] ?: true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+    val temperatureNotificationsEnabled = context.webSettingsDataStore.data
+        .map { it[temperatureNotificationsKey] ?: false }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val lowTemperature = context.webSettingsDataStore.data
+        .map { it[lowTemperatureKey] ?: "8" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "8")
+    val highTemperature = context.webSettingsDataStore.data
+        .map { it[highTemperatureKey] ?: "25" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "25")
 
     var saveStatus by mutableStateOf<String?>(null)
         private set
@@ -107,7 +123,11 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         transmissionUsername: String,
         transmissionPassword: String,
         notificationsEnabled: Boolean,
-        biometricEnabled: Boolean
+        biometricEnabled: Boolean,
+        gameNotificationsEnabled: Boolean,
+        temperatureNotificationsEnabled: Boolean,
+        lowTemperature: String,
+        highTemperature: String
     ) = viewModelScope.launch {
         mealStore.saveAccessKey(mealKey.trim())
         todoStore.saveAccessKey(todoKey.trim())
@@ -122,6 +142,10 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
             it[transmissionPasswordKey] = CredentialCipher.encrypt(transmissionPassword)
             it[notificationsKey] = notificationsEnabled
             it[biometricKey] = biometricEnabled
+            it[gameNotificationsKey] = gameNotificationsEnabled
+            it[temperatureNotificationsKey] = temperatureNotificationsEnabled
+            it[lowTemperatureKey] = lowTemperature
+            it[highTemperatureKey] = highTemperature
         }
         saveStatus = "Settings saved"
     }
@@ -191,6 +215,10 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val storedSophonUrl by vm.sophonUrl.collectAsState()
     val storedNotificationsEnabled by vm.notificationsEnabled.collectAsState()
     val storedBiometricEnabled by vm.biometricEnabled.collectAsState()
+    val storedGameNotificationsEnabled by vm.gameNotificationsEnabled.collectAsState()
+    val storedTemperatureNotificationsEnabled by vm.temperatureNotificationsEnabled.collectAsState()
+    val storedLowTemperature by vm.lowTemperature.collectAsState()
+    val storedHighTemperature by vm.highTemperature.collectAsState()
 
     var mealKey by rememberSaveable(storedMealKey) { mutableStateOf(storedMealKey) }
     var todoKey by rememberSaveable(storedTodoKey) { mutableStateOf(storedTodoKey) }
@@ -205,6 +233,10 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     var transmissionPassword by rememberSaveable(storedTransmissionPassword) { mutableStateOf(storedTransmissionPassword) }
     var notificationsEnabled by rememberSaveable(storedNotificationsEnabled) { mutableStateOf(storedNotificationsEnabled) }
     var biometricEnabled by rememberSaveable(storedBiometricEnabled) { mutableStateOf(storedBiometricEnabled) }
+    var gameNotificationsEnabled by rememberSaveable(storedGameNotificationsEnabled) { mutableStateOf(storedGameNotificationsEnabled) }
+    var temperatureNotificationsEnabled by rememberSaveable(storedTemperatureNotificationsEnabled) { mutableStateOf(storedTemperatureNotificationsEnabled) }
+    var lowTemperature by rememberSaveable(storedLowTemperature) { mutableStateOf(storedLowTemperature) }
+    var highTemperature by rememberSaveable(storedHighTemperature) { mutableStateOf(storedHighTemperature) }
 
     Surface(Modifier.fillMaxSize(), color = Color(0xFF1C1C1C)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -239,6 +271,18 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                             Text("Game nights and service alerts", color = Color(0xFF8D8D8D), style = MaterialTheme.typography.bodySmall)
                         }
                         Switch(checked = notificationsEnabled, onCheckedChange = { notificationsEnabled = it })
+                    }
+                }
+                if (notificationsEnabled) {
+                    item { SettingsToggle("Game night alerts", "Notify once for each upcoming night", gameNotificationsEnabled) { gameNotificationsEnabled = it } }
+                    item { SettingsToggle("Temperature alerts", "Notify when Sophon leaves your preferred range", temperatureNotificationsEnabled) { temperatureNotificationsEnabled = it } }
+                    if (temperatureNotificationsEnabled) {
+                        item {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                SettingsField("Low °C", lowTemperature, Modifier.weight(1f)) { lowTemperature = it }
+                                SettingsField("High °C", highTemperature, Modifier.weight(1f)) { highTemperature = it }
+                            }
+                        }
                     }
                 }
                 item {
@@ -278,7 +322,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 item {
                     Button(
                         onClick = {
-                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, gameWithDaveKey, gameWithDaveUsername, gameWithDavePassword, sophonUrl, transmissionUsername, transmissionPassword, notificationsEnabled, biometricEnabled)
+                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, gameWithDaveKey, gameWithDaveUsername, gameWithDavePassword, sophonUrl, transmissionUsername, transmissionPassword, notificationsEnabled, biometricEnabled, gameNotificationsEnabled, temperatureNotificationsEnabled, lowTemperature, highTemperature)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE66A64))
@@ -297,8 +341,19 @@ private fun SettingsHeading(text: String) {
 }
 
 @Composable
-private fun SettingsField(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(value, onValueChange, Modifier.fillMaxWidth(), label = { Text(label) }, singleLine = true)
+private fun SettingsField(label: String, value: String, modifier: Modifier = Modifier.fillMaxWidth(), onValueChange: (String) -> Unit) {
+    OutlinedTextField(value, onValueChange, modifier, label = { Text(label) }, singleLine = true)
+}
+
+@Composable
+private fun SettingsToggle(title: String, subtitle: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White)
+            Text(subtitle, color = Color(0xFF8D8D8D), style = MaterialTheme.typography.bodySmall)
+        }
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
 }
 
 @Composable

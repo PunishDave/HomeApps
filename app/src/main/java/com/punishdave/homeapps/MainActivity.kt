@@ -68,6 +68,9 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private sealed class Route(val id: String) {
     data object Home : Route("home")
@@ -116,7 +119,9 @@ class MainActivity : FragmentActivity() {
 
                 NavHost(
                     navController = navController,
-                    startDestination = Route.Home.id
+                    startDestination = intent.getStringExtra("homeapps_route")
+                        ?.takeIf { requested -> requested in setOf(Route.GameWithDave.id, Route.Sophon.id) }
+                        ?: Route.Home.id
                 ) {
                     composable(Route.Home.id) {
                         HomeAppsScreen(
@@ -271,6 +276,7 @@ fun HomeAppsScreen(
     val usageVm: HomeUsageViewModel = viewModel()
     val sophonVm: SophonSummaryViewModel = viewModel()
     val settingsVm: AppSettingsViewModel = viewModel()
+    val reliabilityVm: HomeReliabilityViewModel = viewModel()
 
     val tasks by todoVm.tasks.collectAsState()
     val currentWeek by mealVm.currentWeek.collectAsState()
@@ -280,6 +286,11 @@ fun HomeAppsScreen(
     val sophonSummary by sophonVm.summary.collectAsState()
     val sophonUrl by settingsVm.sophonUrl.collectAsState()
     val notificationsEnabled by settingsVm.notificationsEnabled.collectAsState()
+    val gameNotificationsEnabled by settingsVm.gameNotificationsEnabled.collectAsState()
+    val temperatureNotificationsEnabled by settingsVm.temperatureNotificationsEnabled.collectAsState()
+    val lowTemperature by settingsVm.lowTemperature.collectAsState()
+    val highTemperature by settingsVm.highTemperature.collectAsState()
+    val lastUpdated by reliabilityVm.lastUpdated.collectAsState()
     val context = LocalContext.current
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
@@ -314,11 +325,24 @@ fun HomeAppsScreen(
                     }
                     failedServices = failures
                     refreshedServices = setOf("meal_planner", "have_we_got", "todo", "workout", "gamewithdave", "sophon")
+                    val successful = refreshedServices - failures
+                    reliabilityVm.markUpdated(successful)
                     syncAllMsg = if (failures.isEmpty()) "Up to date" else "${failures.size} service${if (failures.size == 1) "" else "s"} need attention"
                     if (notificationsEnabled) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        gameWithDaveVm.dashboard.value.days.firstOrNull { day -> day.game_nights.any { it.status != "removed" } }?.let { day ->
-                            notifyGameNight(context, "Next game night: ${day.display_date}")
+                        if (gameNotificationsEnabled) gameWithDaveVm.dashboard.value.days.firstOrNull { day -> day.game_nights.any { it.status != "removed" } }?.let { day ->
+                            val fingerprint = day.date + ":" + day.game_nights.filter { it.status != "removed" }.joinToString { "${it.team}:${it.status}" }
+                            if (reliabilityVm.claimNotification("game", fingerprint)) notifyGameNight(context, "Next game night: ${day.display_date}")
+                        }
+                        if (temperatureNotificationsEnabled) {
+                            val low = lowTemperature.toDoubleOrNull() ?: 8.0
+                            val high = highTemperature.toDoubleOrNull() ?: 25.0
+                            sophonVm.summary.value?.devices.orEmpty().forEachIndexed { index, device ->
+                                val state = temperatureState(device, low, high)
+                                if (reliabilityVm.updateTemperatureZone(state.deviceId, state.zone) && state.message != null) {
+                                    notifyHome(context, 4200 + index, "Sophon temperature", state.message, "sophon")
+                                }
+                            }
                         }
                     }
                 } catch (_: Exception) {
@@ -346,6 +370,7 @@ fun HomeAppsScreen(
         HomeCard(
             id = "meal_planner",
             healthy = serviceStatus("meal_planner"),
+            updatedAt = lastUpdated["meal_planner"],
             title = "Meal Planner",
             icon = { Icon(Icons.Filled.Restaurant, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("meal_planner", onOpenMealPlanner)
@@ -353,6 +378,7 @@ fun HomeAppsScreen(
         HomeCard(
             id = "have_we_got",
             healthy = serviceStatus("have_we_got"),
+            updatedAt = lastUpdated["have_we_got"],
             title = "Have We Got",
             icon = { Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("have_we_got", onOpenHaveWeGot)
@@ -360,6 +386,7 @@ fun HomeAppsScreen(
         HomeCard(
             id = "todo",
             healthy = serviceStatus("todo"),
+            updatedAt = lastUpdated["todo"],
             title = "To-Do",
             icon = { Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("todo", onOpenTodo)
@@ -367,6 +394,7 @@ fun HomeAppsScreen(
         HomeCard(
             id = "workout",
             healthy = serviceStatus("workout"),
+            updatedAt = lastUpdated["workout"],
             title = "Workout Log",
             icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("workout", onOpenWorkoutLog)
@@ -374,6 +402,7 @@ fun HomeAppsScreen(
         HomeCard(
             id = "gamewithdave",
             healthy = serviceStatus("gamewithdave"),
+            updatedAt = lastUpdated["gamewithdave"],
             title = "GameWithDave",
             icon = { Icon(Icons.Filled.EventAvailable, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("gamewithdave", onOpenGameWithDave)
@@ -393,6 +422,7 @@ fun HomeAppsScreen(
         HomeCard(
             id = "sophon",
             healthy = serviceStatus("sophon"),
+            updatedAt = lastUpdated["sophon"],
             title = "Sophon",
             icon = { Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("sophon", onOpenSophon)
@@ -475,65 +505,6 @@ fun HomeAppsScreen(
                 contentColor = accent
             )
         }
-    }
-}
-
-@Composable
-private fun TodayOverview(
-    taskCount: Int,
-    meal: String?,
-    workoutDone: Boolean,
-    gameNight: String?,
-    sophonDevices: List<SophonDevice>,
-    onTodo: () -> Unit,
-    onMeal: () -> Unit,
-    onWorkout: () -> Unit,
-    onGameWithDave: () -> Unit,
-    onSophon: () -> Unit
-) {
-    Surface(color = Color(0xFF222222), shape = RoundedCornerShape(12.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
-            Text("TODAY", color = Color(0xFFE66A64), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            TodayRow("Tasks", if (taskCount == 0) "Nothing due" else "$taskCount due", onTodo)
-            TodayRow("Meal", meal ?: "Not planned", onMeal)
-            TodayRow("Workout", if (workoutDone) "Logged today" else "Not logged", onWorkout)
-            gameNight?.let { TodayRow("Game night", it, onGameWithDave) }
-            if (sophonDevices.isNotEmpty()) SophonTodayRow(sophonDevices, onSophon)
-        }
-    }
-}
-
-@Composable
-private fun SophonTodayRow(devices: List<SophonDevice>, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("Sophon", color = Color(0xFF999999), fontSize = 12.sp, modifier = Modifier.width(82.dp))
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            devices.forEach { device ->
-                val name = when (device.device_id) {
-                    "garden-sensor-01" -> "Garden"
-                    "office-temp-reader" -> "Office"
-                    else -> device.device_id
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(name, color = Color.White, fontSize = 13.sp)
-                    Text(device.temperature_c?.let { "%.1f°C".format(it) } ?: "--", color = Color(0xFFE66A64), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TodayRow(label: String, value: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, color = Color(0xFF999999), fontSize = 12.sp, modifier = Modifier.width(82.dp))
-        Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -663,6 +634,7 @@ private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color, modifier: Modifie
                 title = card.title,
                 accent = accent,
                 healthy = card.healthy,
+                updatedAt = card.updatedAt,
                 icon = card.icon,
                 onClick = card.onClick,
                 modifier = Modifier
@@ -680,7 +652,8 @@ private fun AppCard(
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    healthy: Boolean? = null
+    healthy: Boolean? = null,
+    updatedAt: Long? = null
 ) {
     val cardBg = Color(0xFF222222)
     val shape = RoundedCornerShape(10.dp)
@@ -703,14 +676,16 @@ private fun AppCard(
                     Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { icon() }
                 }
                 Spacer(Modifier.width(12.dp))
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(text = title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    updatedAt?.let {
+                        Text(
+                            text = "${if (healthy == true) "Updated" else "Cached"} ${formatRefreshTime(it)}",
+                            color = Color(0xFF777777),
+                            fontSize = 10.sp
+                        )
+                    }
+                }
                 healthy?.let {
                     Surface(
                         modifier = Modifier.size(7.dp),
@@ -726,7 +701,11 @@ private fun AppCard(
 private data class HomeCard(
     val id: String,
     val healthy: Boolean? = null,
+    val updatedAt: Long? = null,
     val title: String,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit
 )
+
+private fun formatRefreshTime(epochMillis: Long): String =
+    DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(epochMillis))

@@ -145,7 +145,7 @@ private fun GameWithDaveHeader(onBack: () -> Unit) {
 }
 
 @Composable
-private fun CompactCalendar(
+fun CompactCalendar(
     days: List<GameWithDaveDay>,
     selectedMonth: String,
     onMonthSelected: (String) -> Unit

@@ -13,15 +13,27 @@ android {
         applicationId = "com.punishdave.homeapps"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        val keystorePath = System.getenv("HOMEAPPS_KEYSTORE")
+        if (!keystorePath.isNullOrBlank()) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("HOMEAPPS_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("HOMEAPPS_KEY_ALIAS")
+                keyPassword = System.getenv("HOMEAPPS_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
