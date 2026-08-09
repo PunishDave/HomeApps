@@ -6,6 +6,11 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
+    <exclude domain="file" path="datastore/gamewithdave_store.preferences_pb" />
+    <exclude domain="file" path="datastore/web_app_settings.preferences_pb" />
+    <exclude domain="file" path="datastore/meal_planner_store.preferences_pb" />
+    <exclude domain="file" path="datastore/todo_store.preferences_pb" />
+    <exclude domain="file" path="datastore/workout_store.preferences_pb" />
     <!--
    <include domain="sharedpref" path="."/>
    <exclude domain="sharedpref" path="device.xml"/>

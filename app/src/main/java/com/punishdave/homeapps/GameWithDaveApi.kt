@@ -73,11 +73,12 @@ data class GameWithDaveAvailabilityRequest(
     val user_role: String,
     val start_date: String,
     val end_date: String,
-    val status: String
+    val status: String,
+    val password: String
 )
 
 @JsonClass(generateAdapter = true)
-data class GameWithDaveNightUpdateRequest(val action: String)
+data class GameWithDaveNightUpdateRequest(val action: String, val password: String)
 
 @JsonClass(generateAdapter = true)
 data class GameWithDaveUpdateResponse(val updated: Boolean, val message: String)

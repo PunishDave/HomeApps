@@ -1,14 +1,21 @@
 package com.punishdave.homeapps
 
 import android.os.Bundle
+import android.Manifest
+import android.os.Build
 import android.graphics.Bitmap
 import android.view.ViewGroup
 import android.webkit.HttpAuthHandler
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -38,6 +45,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -58,6 +66,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 private sealed class Route(val id: String) {
     data object Home : Route("home")
@@ -83,9 +93,10 @@ private const val WALLFACER_URL = "http://192.168.0.116:8080"
 private const val SOPHON_URL = "http://192.168.0.234:8096"
 private const val DROPLET_URL = "http://192.168.0.234:8095"
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        createHomeNotificationChannel(this)
 
         setContent {
             MaterialTheme(
@@ -100,6 +111,8 @@ class MainActivity : ComponentActivity() {
                 )
             ) {
                 val navController = rememberNavController()
+                val rootSettingsVm: AppSettingsViewModel = viewModel()
+                val protectSettings by rootSettingsVm.biometricEnabled.collectAsState()
 
                 NavHost(
                     navController = navController,
@@ -116,7 +129,9 @@ class MainActivity : ComponentActivity() {
                             onOpenWallfacer = { navController.navigate(Route.Wallfacer.id) },
                             onOpenSophon = { navController.navigate(Route.Sophon.id) },
                             onOpenDroplet = { navController.navigate(Route.Droplet.id) },
-                            onOpenSettings = { navController.navigate(Route.Settings.id) }
+                            onOpenSettings = {
+                                openProtectedSettings(protectSettings) { navController.navigate(Route.Settings.id) }
+                            }
                         )
                     }
 
@@ -198,6 +213,27 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun openProtectedSettings(enabled: Boolean, onAuthenticated: () -> Unit) {
+        if (!enabled) {
+            onAuthenticated()
+            return
+        }
+        val prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                onAuthenticated()
+            }
+        })
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Open HomeApps Settings")
+            .setSubtitle("Confirm your identity to view saved connections")
+            .setAllowedAuthenticators(
+                androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+        prompt.authenticate(info)
+    }
 }
 
 @Composable
@@ -230,12 +266,29 @@ fun HomeAppsScreen(
     val mealVm: MealPlannerViewModel = viewModel()
     val haveVm: HaveWeGotViewModel = viewModel()
     val todoVm: TodoViewModel = viewModel()
+    val workoutVm: WorkoutViewModel = viewModel()
     val gameWithDaveVm: GameWithDaveViewModel = viewModel()
+    val usageVm: HomeUsageViewModel = viewModel()
+    val sophonVm: SophonSummaryViewModel = viewModel()
+    val settingsVm: AppSettingsViewModel = viewModel()
+
+    val tasks by todoVm.tasks.collectAsState()
+    val currentWeek by mealVm.currentWeek.collectAsState()
+    val workoutEntries by workoutVm.entries.collectAsState()
+    val gameWithDaveDashboard by gameWithDaveVm.dashboard.collectAsState()
+    val usageCounts by usageVm.counts.collectAsState()
+    val sophonSummary by sophonVm.summary.collectAsState()
+    val sophonUrl by settingsVm.sophonUrl.collectAsState()
+    val notificationsEnabled by settingsVm.notificationsEnabled.collectAsState()
+    val context = LocalContext.current
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     val bg = Color(0xFF1C1C1C)
     val accent = Color(0xFFE66A64)
     var syncingAll by rememberSaveable { mutableStateOf(false) }
     var syncAllMsg by rememberSaveable { mutableStateOf<String?>(null) }
+    var refreshedServices by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var failedServices by remember { mutableStateOf<Set<String>>(emptySet()) }
     val scope = rememberCoroutineScope()
     val syncAll: () -> Unit = {
         if (!syncingAll) {
@@ -247,9 +300,27 @@ fun HomeAppsScreen(
                     jobs += mealVm.sync()
                     jobs += haveVm.refresh()
                     jobs += todoVm.syncFromApi()
+                    jobs += workoutVm.syncFromApi()
                     jobs += gameWithDaveVm.refresh()
+                    jobs += sophonVm.refresh(sophonUrl)
                     jobs.joinAll()
-                    syncAllMsg = "Up to date"
+                    val failures = buildSet {
+                        if (mealVm.lastError.value != null) add("meal_planner")
+                        if (haveVm.error.value != null) add("have_we_got")
+                        if (todoVm.lastError.value != null) add("todo")
+                        if (workoutVm.lastError.value != null) add("workout")
+                        if (gameWithDaveVm.message.value != null) add("gamewithdave")
+                        if (sophonVm.error.value != null) add("sophon")
+                    }
+                    failedServices = failures
+                    refreshedServices = setOf("meal_planner", "have_we_got", "todo", "workout", "gamewithdave", "sophon")
+                    syncAllMsg = if (failures.isEmpty()) "Up to date" else "${failures.size} service${if (failures.size == 1) "" else "s"} need attention"
+                    if (notificationsEnabled) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        gameWithDaveVm.dashboard.value.days.firstOrNull { day -> day.game_nights.any { it.status != "removed" } }?.let { day ->
+                            notifyGameNight(context, "Next game night: ${day.display_date}")
+                        }
+                    }
                 } catch (_: Exception) {
                     syncAllMsg = "Refresh finished with an error"
                 } finally {
@@ -260,53 +331,93 @@ fun HomeAppsScreen(
     }
     val pullRefreshState = rememberPullRefreshState(syncingAll, syncAll)
 
+    fun tracked(id: String, open: () -> Unit): () -> Unit = {
+        usageVm.recordOpen(id)
+        open()
+    }
+
+    fun serviceStatus(id: String): Boolean? = when {
+        id in failedServices -> false
+        id in refreshedServices -> true
+        else -> null
+    }
+
     val cards = listOf(
         HomeCard(
+            id = "meal_planner",
+            healthy = serviceStatus("meal_planner"),
             title = "Meal Planner",
             icon = { Icon(Icons.Filled.Restaurant, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenMealPlanner
+            onClick = tracked("meal_planner", onOpenMealPlanner)
         ),
         HomeCard(
+            id = "have_we_got",
+            healthy = serviceStatus("have_we_got"),
             title = "Have We Got",
             icon = { Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenHaveWeGot
+            onClick = tracked("have_we_got", onOpenHaveWeGot)
         ),
         HomeCard(
+            id = "todo",
+            healthy = serviceStatus("todo"),
             title = "To-Do",
             icon = { Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenTodo
+            onClick = tracked("todo", onOpenTodo)
         ),
         HomeCard(
+            id = "workout",
+            healthy = serviceStatus("workout"),
             title = "Workout Log",
             icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenWorkoutLog
+            onClick = tracked("workout", onOpenWorkoutLog)
         ),
         HomeCard(
+            id = "gamewithdave",
+            healthy = serviceStatus("gamewithdave"),
             title = "GameWithDave",
             icon = { Icon(Icons.Filled.EventAvailable, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenGameWithDave
+            onClick = tracked("gamewithdave", onOpenGameWithDave)
         ),
         HomeCard(
+            id = "transmission",
             title = "Transmission",
             icon = { Icon(Icons.Filled.CloudDownload, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenTransmission
+            onClick = tracked("transmission", onOpenTransmission)
         ),
         HomeCard(
+            id = "wallfacer",
             title = "Wallfacer",
             icon = { Icon(Icons.Filled.Wallpaper, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenWallfacer
+            onClick = tracked("wallfacer", onOpenWallfacer)
         ),
         HomeCard(
+            id = "sophon",
+            healthy = serviceStatus("sophon"),
             title = "Sophon",
             icon = { Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenSophon
+            onClick = tracked("sophon", onOpenSophon)
         ),
         HomeCard(
+            id = "droplet",
             title = "Droplet",
             icon = { Icon(Icons.Filled.CloudQueue, contentDescription = null, modifier = Modifier.size(24.dp)) },
-            onClick = onOpenDroplet
+            onClick = tracked("droplet", onOpenDroplet)
         )
     )
+    val rankedIds = rankHomeSectionIds(cards.map { it.id }, usageCounts)
+    val rankedCards = rankedIds.mapNotNull { id -> cards.firstOrNull { it.id == id } }
+
+    val today = LocalDate.now()
+    val todayTasks = tasks.count { !it.done && parseFlexibleDate(it.dueDate) == today }
+    val tonightMeal = currentWeek?.let { week ->
+        val offset = runCatching { ChronoUnit.DAYS.between(LocalDate.parse(week.week_start), today).toInt() }.getOrNull()
+        offset?.takeIf { it in week.meals.indices }?.let { week.meals[it].title }
+    }
+    val workoutDone = workoutEntries.any { it.date == today.toString() }
+    val nextGameNight = gameWithDaveDashboard.days
+        .asSequence()
+        .flatMap { day -> day.game_nights.asSequence().filter { it.status != "removed" }.map { day to it } }
+        .firstOrNull()
 
     Surface(modifier = Modifier.fillMaxSize(), color = bg) {
         Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
@@ -322,8 +433,31 @@ fun HomeAppsScreen(
                     color = Color(0xFF8D8D8D),
                     fontSize = 12.sp
                 )
-                Spacer(modifier = Modifier.height(18.dp))
-                HomeAppsGrid(cards = cards, accent = accent, modifier = Modifier.weight(1f))
+                if (syncingAll) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().height(2.dp),
+                        color = accent,
+                        trackColor = Color(0xFF2B2B2B)
+                    )
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                TodayOverview(
+                    taskCount = todayTasks,
+                    meal = tonightMeal,
+                    workoutDone = workoutDone,
+                    gameNight = nextGameNight?.let { (day, night) -> "${day.display_date}: ${night.team_label}" },
+                    sophonDevices = sophonSummary?.devices.orEmpty(),
+                    onTodo = tracked("todo", onOpenTodo),
+                    onMeal = tracked("meal_planner", onOpenMealPlanner),
+                    onWorkout = tracked("workout", onOpenWorkoutLog),
+                    onGameWithDave = tracked("gamewithdave", onOpenGameWithDave),
+                    onSophon = tracked("sophon", onOpenSophon)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Apps", color = Color(0xFFE66A64), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                HomeAppsGrid(cards = rankedCards, accent = accent, modifier = Modifier.weight(1f))
                 Spacer(Modifier.height(12.dp))
                 AppCard(
                     title = "Settings",
@@ -341,6 +475,65 @@ fun HomeAppsScreen(
                 contentColor = accent
             )
         }
+    }
+}
+
+@Composable
+private fun TodayOverview(
+    taskCount: Int,
+    meal: String?,
+    workoutDone: Boolean,
+    gameNight: String?,
+    sophonDevices: List<SophonDevice>,
+    onTodo: () -> Unit,
+    onMeal: () -> Unit,
+    onWorkout: () -> Unit,
+    onGameWithDave: () -> Unit,
+    onSophon: () -> Unit
+) {
+    Surface(color = Color(0xFF222222), shape = RoundedCornerShape(12.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text("TODAY", color = Color(0xFFE66A64), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            TodayRow("Tasks", if (taskCount == 0) "Nothing due" else "$taskCount due", onTodo)
+            TodayRow("Meal", meal ?: "Not planned", onMeal)
+            TodayRow("Workout", if (workoutDone) "Logged today" else "Not logged", onWorkout)
+            gameNight?.let { TodayRow("Game night", it, onGameWithDave) }
+            if (sophonDevices.isNotEmpty()) SophonTodayRow(sophonDevices, onSophon)
+        }
+    }
+}
+
+@Composable
+private fun SophonTodayRow(devices: List<SophonDevice>, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Sophon", color = Color(0xFF999999), fontSize = 12.sp, modifier = Modifier.width(82.dp))
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            devices.forEach { device ->
+                val name = when (device.device_id) {
+                    "garden-sensor-01" -> "Garden"
+                    "office-temp-reader" -> "Office"
+                    else -> device.device_id
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(name, color = Color.White, fontSize = 13.sp)
+                    Text(device.temperature_c?.let { "%.1f°C".format(it) } ?: "--", color = Color(0xFFE66A64), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodayRow(label: String, value: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = Color(0xFF999999), fontSize = 12.sp, modifier = Modifier.width(82.dp))
+        Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -469,6 +662,7 @@ private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color, modifier: Modifie
             AppCard(
                 title = card.title,
                 accent = accent,
+                healthy = card.healthy,
                 icon = card.icon,
                 onClick = card.onClick,
                 modifier = Modifier
@@ -485,7 +679,8 @@ private fun AppCard(
     accent: Color,
     icon: @Composable () -> Unit,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    healthy: Boolean? = null
 ) {
     val cardBg = Color(0xFF222222)
     val shape = RoundedCornerShape(10.dp)
@@ -513,14 +708,24 @@ private fun AppCard(
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
                 )
+                healthy?.let {
+                    Surface(
+                        modifier = Modifier.size(7.dp),
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = if (it) Color(0xFF7DB68A) else Color(0xFFE66A64)
+                    ) {}
+                }
             }
         }
     }
 }
 
 private data class HomeCard(
+    val id: String,
+    val healthy: Boolean? = null,
     val title: String,
     val icon: @Composable () -> Unit,
     val onClick: () -> Unit

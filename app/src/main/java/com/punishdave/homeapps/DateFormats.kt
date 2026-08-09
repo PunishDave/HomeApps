@@ -3,9 +3,11 @@ package com.punishdave.homeapps
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
+import java.time.format.ResolverStyle
 import java.util.Locale
 
-private val DisplayDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy")
+private val DisplayDateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd-MM-uuuu")
+    .withResolverStyle(ResolverStyle.STRICT)
 private val IsoDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
 fun LocalDate.toDisplayDate(): String = format(DisplayDateFormatter)

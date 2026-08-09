@@ -1,5 +1,6 @@
 package com.punishdave.homeapps
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,8 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -36,7 +39,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,11 +46,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,6 +60,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
 import java.util.Locale
 
 private val GwdBackground = Color(0xFF1C1C1C)
@@ -65,6 +70,8 @@ private val GwdBorder = Color(0xFF383838)
 private val GwdMuted = Color(0xFF999999)
 private val GwdAccent = Color(0xFFE66A64)
 private val GwdPositive = Color(0xFF7DB68A)
+private val GwdDateFormatter = DateTimeFormatter.ofPattern("dd-MM-uuuu", Locale.UK)
+    .withResolverStyle(ResolverStyle.STRICT)
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -74,6 +81,8 @@ fun GameWithDaveScreen(onBack: () -> Unit) {
     val loading by vm.isLoading.collectAsState()
     val message by vm.message.collectAsState()
     val accessKey by vm.accessKey.collectAsState()
+    val username by vm.username.collectAsState()
+    var selectedCalendarMonth by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val pullRefresh = rememberPullRefreshState(loading, vm::refresh)
 
     Surface(Modifier.fillMaxSize(), color = GwdBackground) {
@@ -90,9 +99,15 @@ fun GameWithDaveScreen(onBack: () -> Unit) {
                 if (accessKey.isBlank()) {
                     item { EmptyPanel("Add the GameWithDave access key in Settings before refreshing.") }
                 } else {
-                    item { CompactCalendar(dashboard.days) }
+                    item {
+                        CompactCalendar(
+                            days = dashboard.days,
+                            selectedMonth = selectedCalendarMonth,
+                            onMonthSelected = { selectedCalendarMonth = it }
+                        )
+                    }
                     item { SectionLabel("UPDATE", "Your availability") }
-                    item { AvailabilityEditor(dashboard.users, loading, vm::saveAvailability) }
+                    item { AvailabilityEditor(username, loading, vm::saveAvailability) }
                     item { SectionLabel("ADMIN", "Upcoming game nights") }
                     if (!loading && dashboard.days.none { it.game_nights.isNotEmpty() }) {
                         item { EmptyPanel("No upcoming game nights yet.") }
@@ -130,10 +145,13 @@ private fun GameWithDaveHeader(onBack: () -> Unit) {
 }
 
 @Composable
-private fun CompactCalendar(days: List<GameWithDaveDay>) {
+private fun CompactCalendar(
+    days: List<GameWithDaveDay>,
+    selectedMonth: String,
+    onMonthSelected: (String) -> Unit
+) {
     val datedDays = remember(days) { days.mapNotNull { day -> runCatching { LocalDate.parse(day.date) }.getOrNull()?.let { it to day } }.toMap() }
-    val firstAvailableMonth = datedDays.keys.minOrNull()?.let(YearMonth::from)
-    var month by remember(firstAvailableMonth) { mutableStateOf(firstAvailableMonth ?: YearMonth.now()) }
+    val month = YearMonth.parse(selectedMonth)
     val firstDayOffset = month.atDay(1).dayOfWeek.value - 1
     val cells = List(firstDayOffset) { null } + (1..month.lengthOfMonth()).map(month::atDay)
     val paddedCells = cells + List((7 - cells.size % 7) % 7) { null }
@@ -145,7 +163,7 @@ private fun CompactCalendar(days: List<GameWithDaveDay>) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = { month = month.minusMonths(1) }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { onMonthSelected(month.minusMonths(1).toString()) }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Filled.ChevronLeft, "Previous month", tint = GwdMuted)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -156,7 +174,7 @@ private fun CompactCalendar(days: List<GameWithDaveDay>) {
                     )
                     Text(month.year.toString(), color = GwdMuted, style = MaterialTheme.typography.labelSmall)
                 }
-                IconButton(onClick = { month = month.plusMonths(1) }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { onMonthSelected(month.plusMonths(1).toString()) }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Filled.ChevronRight, "Next month", tint = GwdMuted)
                 }
             }
@@ -244,25 +262,32 @@ private fun SectionLabel(eyebrow: String, title: String) {
 }
 
 @Composable
-private fun AvailabilityEditor(users: List<GameWithDaveUser>, loading: Boolean, onSave: (String, String, String, String) -> Unit) {
-    var user by remember(users) { mutableStateOf(users.firstOrNull()?.role.orEmpty()) }
+private fun AvailabilityEditor(username: String, loading: Boolean, onSave: (String, String, String) -> Unit) {
     var status by remember { mutableStateOf("yes") }
-    var startDate by remember { mutableStateOf(LocalDate.now().toString()) }
-    var endDate by remember { mutableStateOf(LocalDate.now().toString()) }
+    var startDate by remember { mutableStateOf(LocalDate.now().format(GwdDateFormatter)) }
+    var endDate by remember { mutableStateOf(LocalDate.now().format(GwdDateFormatter)) }
+    val context = LocalContext.current
 
     Surface(color = GwdPanelSoft, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, GwdBorder)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Box(Modifier.weight(1f)) { ChoiceField("Member", user, users.map { it.role }) { user = it } }
-                Box(Modifier.weight(1f)) { ChoiceField("Status", status, listOf("yes", "tentative", "no")) { status = it } }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Updating as", color = GwdMuted, style = MaterialTheme.typography.labelSmall)
+                    Text(username.ifBlank { "Set user in Settings" }, color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+                Box(Modifier.width(150.dp)) { StatusDropdown(status) { status = it } }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(startDate, { startDate = it }, Modifier.weight(1f), label = { Text("From") }, placeholder = { Text("YYYY-MM-DD") }, singleLine = true)
-                OutlinedTextField(endDate, { endDate = it }, Modifier.weight(1f), label = { Text("To") }, placeholder = { Text("YYYY-MM-DD") }, singleLine = true)
+                DatePickerField("From", startDate, Modifier.weight(1f)) {
+                    showGameWithDaveDatePicker(context, startDate) { startDate = it }
+                }
+                DatePickerField("To", endDate, Modifier.weight(1f)) {
+                    showGameWithDaveDatePicker(context, endDate) { endDate = it }
+                }
             }
             Button(
-                onClick = { onSave(user, startDate, endDate, status) },
-                enabled = !loading && user.isNotBlank() && validDate(startDate) && validDate(endDate),
+                onClick = { onSave(startDate, endDate, status) },
+                enabled = !loading && username.isNotBlank() && validDate(startDate) && validDate(endDate),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GwdAccent)
@@ -272,20 +297,82 @@ private fun AvailabilityEditor(users: List<GameWithDaveUser>, loading: Boolean, 
 }
 
 @Composable
-private fun ChoiceField(label: String, value: String, options: List<String>, onSelect: (String) -> Unit) {
+private fun DatePickerField(label: String, value: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        modifier = modifier.height(58.dp).clickable(onClick = onClick),
+        color = Color.Transparent,
+        shape = RoundedCornerShape(4.dp),
+        border = BorderStroke(1.dp, Color(0xFF777777))
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(label, color = GwdMuted, style = MaterialTheme.typography.labelSmall)
+                Text(value, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+            }
+            Icon(Icons.Filled.CalendarMonth, contentDescription = "Choose $label date", tint = GwdAccent, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+private fun showGameWithDaveDatePicker(
+    context: android.content.Context,
+    current: String,
+    onSelected: (String) -> Unit
+) {
+    val initial = runCatching { LocalDate.parse(current, GwdDateFormatter) }.getOrDefault(LocalDate.now())
+    DatePickerDialog(
+        context,
+        { _, year, month, day ->
+            onSelected(LocalDate.of(year, month + 1, day).format(GwdDateFormatter))
+        },
+        initial.year,
+        initial.monthValue - 1,
+        initial.dayOfMonth
+    ).show()
+}
+
+@Composable
+private fun StatusDropdown(value: String, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedTextField(
-            value = value.replaceFirstChar { it.uppercase() },
-            onValueChange = {},
-            modifier = Modifier.fillMaxWidth().clickable { expanded = true },
-            label = { Text(label) },
-            readOnly = true,
-            enabled = options.isNotEmpty()
-        )
-        DropdownMenu(expanded, { expanded = false }) {
-            options.forEach { option ->
-                DropdownMenuItem(text = { Text(option.replaceFirstChar { it.uppercase() }) }, onClick = { onSelect(option); expanded = false })
+    val options = listOf(
+        "yes" to "Available",
+        "tentative" to "Tentative",
+        "no" to "Not available"
+    )
+    Box(Modifier.fillMaxWidth()) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(58.dp).clickable { expanded = true },
+            color = Color.Transparent,
+            shape = RoundedCornerShape(4.dp),
+            border = BorderStroke(1.dp, Color(0xFF777777))
+        ) {
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Status", color = GwdMuted, style = MaterialTheme.typography.labelSmall)
+                    Text(options.first { it.first == value }.second, color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                }
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Choose status", tint = GwdAccent)
+            }
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.width(190.dp)
+        ) {
+            options.forEach { (option, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        onSelect(option)
+                        expanded = false
+                    }
+                )
             }
         }
     }
@@ -330,4 +417,4 @@ private fun EmptyPanel(text: String) {
     }
 }
 
-private fun validDate(value: String): Boolean = runCatching { LocalDate.parse(value) }.isSuccess
+private fun validDate(value: String): Boolean = runCatching { LocalDate.parse(value, GwdDateFormatter) }.isSuccess

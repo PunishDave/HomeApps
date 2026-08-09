@@ -6,12 +6,21 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
+import java.util.Locale
+
+private val gameWithDaveDateFormatter = DateTimeFormatter.ofPattern("dd-MM-uuuu", Locale.UK)
+    .withResolverStyle(ResolverStyle.STRICT)
 
 class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
     private val store = GameWithDaveStore(app.applicationContext)
-    val accessKey = store.accessKeyFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val accessKey = store.accessKeyFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    val username = store.usernameFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     private val _dashboard = MutableStateFlow(GameWithDaveDashboard())
     val dashboard: StateFlow<GameWithDaveDashboard> = _dashboard
     val isLoading = MutableStateFlow(false)
@@ -23,7 +32,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         isLoading.value = true
         message.value = null
         try {
-            val key = accessKey.value.trim().takeIf { it.isNotEmpty() }
+            val key = storedAccessKey()
             _dashboard.value = Network.gameWithDaveApi.dashboard(key, key?.let { "Bearer $it" })
         } catch (error: Exception) {
             message.value = error.message ?: "Unable to load GameWithDave"
@@ -32,28 +41,33 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun saveAvailability(role: String, startDate: String, endDate: String, status: String) = viewModelScope.launch {
+    fun saveAvailability(startDate: String, endDate: String, status: String) = viewModelScope.launch {
         runUpdate {
-            val key = accessKey.value.trim().takeIf { it.isNotEmpty() }
+            val key = storedAccessKey()
+            val role = store.usernameFlow.first().trim().ifEmpty { throw IllegalStateException("Add your GameWithDave user in Settings.") }
+            val secret = store.passwordFlow.first().ifEmpty { throw IllegalStateException("Add your GameWithDave password in Settings.") }
+            val apiStartDate = LocalDate.parse(startDate, gameWithDaveDateFormatter).toString()
+            val apiEndDate = LocalDate.parse(endDate, gameWithDaveDateFormatter).toString()
             Network.gameWithDaveApi.saveAvailability(
                 key,
                 key?.let { "Bearer $it" },
                 key,
-                GameWithDaveAvailabilityRequest(role, startDate, endDate, status)
+                GameWithDaveAvailabilityRequest(role, apiStartDate, apiEndDate, status, secret)
             ).message
         }
     }
 
     fun updateNight(night: GameWithDaveNight, action: String) = viewModelScope.launch {
         runUpdate {
-            val key = accessKey.value.trim().takeIf { it.isNotEmpty() }
+            val key = storedAccessKey()
+            val secret = store.passwordFlow.first()
             Network.gameWithDaveApi.updateNight(
                 night.date,
                 night.team,
                 key,
                 key?.let { "Bearer $it" },
                 key,
-                GameWithDaveNightUpdateRequest(action)
+                GameWithDaveNightUpdateRequest(action, secret)
             )
             "Game night updated"
         }
@@ -64,7 +78,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         message.value = null
         try {
             message.value = block()
-            val key = accessKey.value.trim().takeIf { it.isNotEmpty() }
+            val key = storedAccessKey()
             _dashboard.value = Network.gameWithDaveApi.dashboard(key, key?.let { "Bearer $it" })
         } catch (error: Exception) {
             message.value = error.message ?: "Update failed"
@@ -72,4 +86,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
             isLoading.value = false
         }
     }
+
+    private suspend fun storedAccessKey(): String? =
+        store.accessKeyFlow.first().trim().takeIf { it.isNotEmpty() }
 }

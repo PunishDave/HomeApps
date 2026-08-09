@@ -33,7 +33,7 @@ class MealPlannerStore(private val context: Context) {
     }
 
     val accessKeyFlow: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[KEY_ACCESS_KEY] ?: ""
+        CredentialCipher.decrypt(prefs[KEY_ACCESS_KEY] ?: "")
     }
 
     suspend fun saveRecipes(recipes: List<Recipe>) {
@@ -65,6 +65,6 @@ class MealPlannerStore(private val context: Context) {
     }
 
     suspend fun saveAccessKey(key: String) {
-        context.dataStore.edit { it[KEY_ACCESS_KEY] = key }
+        context.dataStore.edit { it[KEY_ACCESS_KEY] = CredentialCipher.encrypt(key) }
     }
 }

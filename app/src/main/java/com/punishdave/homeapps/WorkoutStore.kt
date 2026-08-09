@@ -32,7 +32,7 @@ class WorkoutStore(private val context: Context) {
     }
 
     val accessKeyFlow: Flow<String> = context.workoutDataStore.data.map { prefs ->
-        prefs[KEY_ACCESS] ?: ""
+        CredentialCipher.decrypt(prefs[KEY_ACCESS] ?: "")
     }
 
     val daysFlow: Flow<List<WorkoutDay>> = context.workoutDataStore.data.map { prefs ->
@@ -46,7 +46,7 @@ class WorkoutStore(private val context: Context) {
     }
 
     suspend fun saveAccessKey(key: String) {
-        context.workoutDataStore.edit { it[KEY_ACCESS] = key }
+        context.workoutDataStore.edit { it[KEY_ACCESS] = CredentialCipher.encrypt(key) }
     }
 
     suspend fun saveDays(days: List<WorkoutDay>) {

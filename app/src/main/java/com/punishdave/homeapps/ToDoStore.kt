@@ -36,7 +36,7 @@ class ToDoStore(private val context: Context) {
     }
 
     val accessKeyFlow: Flow<String> = context.todoDataStore.data.map { prefs ->
-        prefs[KEY_ACCESS] ?: ""
+        CredentialCipher.decrypt(prefs[KEY_ACCESS] ?: "")
     }
 
     val categoryFlow: Flow<String> = context.todoDataStore.data.map { prefs ->
@@ -68,7 +68,7 @@ class ToDoStore(private val context: Context) {
     }
 
     suspend fun saveAccessKey(key: String) {
-        context.todoDataStore.edit { it[KEY_ACCESS] = key }
+        context.todoDataStore.edit { it[KEY_ACCESS] = CredentialCipher.encrypt(key) }
     }
 
     suspend fun saveCategory(cat: String) {
