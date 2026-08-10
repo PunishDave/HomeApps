@@ -13,10 +13,16 @@ class GameWithDaveStore(private val context: Context) {
     private val accessKey = stringPreferencesKey("gamewithdave_access_key")
     private val username = stringPreferencesKey("gamewithdave_username")
     private val password = stringPreferencesKey("gamewithdave_password")
+    private val dashboard = stringPreferencesKey("gamewithdave_dashboard_json")
 
     val accessKeyFlow: Flow<String> = context.gameWithDaveDataStore.data.map { CredentialCipher.decrypt(it[accessKey] ?: "") }
     val usernameFlow: Flow<String> = context.gameWithDaveDataStore.data.map { CredentialCipher.decrypt(it[username] ?: "") }
     val passwordFlow: Flow<String> = context.gameWithDaveDataStore.data.map { CredentialCipher.decrypt(it[password] ?: "") }
+    val dashboardFlow: Flow<GameWithDaveDashboard> = context.gameWithDaveDataStore.data.map { preferences ->
+        preferences[dashboard]?.let { json ->
+            runCatching { Network.moshi.adapter(GameWithDaveDashboard::class.java).fromJson(json) }.getOrNull()
+        } ?: GameWithDaveDashboard()
+    }
 
     suspend fun saveAccessKey(key: String) {
         context.gameWithDaveDataStore.edit { it[accessKey] = CredentialCipher.encrypt(key) }
@@ -26,6 +32,12 @@ class GameWithDaveStore(private val context: Context) {
         context.gameWithDaveDataStore.edit {
             it[username] = CredentialCipher.encrypt(user)
             it[password] = CredentialCipher.encrypt(secret)
+        }
+    }
+
+    suspend fun saveDashboard(value: GameWithDaveDashboard) {
+        context.gameWithDaveDataStore.edit {
+            it[dashboard] = Network.moshi.adapter(GameWithDaveDashboard::class.java).toJson(value)
         }
     }
 }

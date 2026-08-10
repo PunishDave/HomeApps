@@ -1,10 +1,18 @@
 package com.punishdave.homeapps
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.squareup.moshi.JsonClass
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -27,9 +35,27 @@ data class SophonDevice(
 @JsonClass(generateAdapter = true)
 data class SophonCounts(val total: Int = 0, val online: Int = 0, val stale: Int = 0)
 
-class SophonSummaryViewModel : ViewModel() {
+private val Context.sophonDataStore by preferencesDataStore(name = "sophon_summary_store")
+
+class SophonSummaryStore(private val context: Context) {
+    private val summaryKey = stringPreferencesKey("summary_json")
+    val summaryFlow = context.sophonDataStore.data.map { preferences ->
+        preferences[summaryKey]?.let { json ->
+            runCatching { Network.moshi.adapter(SophonSummaryResponse::class.java).fromJson(json) }.getOrNull()
+        }
+    }
+
+    suspend fun save(value: SophonSummaryResponse) {
+        context.sophonDataStore.edit {
+            it[summaryKey] = Network.moshi.adapter(SophonSummaryResponse::class.java).toJson(value)
+        }
+    }
+}
+
+class SophonSummaryViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = SophonSummaryRepository(NetworkSophonSummarySource())
-    val summary = MutableStateFlow<SophonSummaryResponse?>(null)
+    private val store = SophonSummaryStore(app.applicationContext)
+    val summary = store.summaryFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val error = MutableStateFlow<String?>(null)
     val loading = MutableStateFlow(false)
 
@@ -37,7 +63,7 @@ class SophonSummaryViewModel : ViewModel() {
         loading.value = true
         error.value = null
         try {
-            summary.value = repository.fetch(url)
+            store.save(repository.fetch(url))
         } catch (exception: Exception) {
             error.value = exception.message ?: "Sophon unavailable"
         } finally {

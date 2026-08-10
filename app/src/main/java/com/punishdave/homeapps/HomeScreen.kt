@@ -27,9 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -72,6 +74,7 @@ fun HomeAppsScreen(
     val temperatureNotificationsEnabled by settingsVm.temperatureNotificationsEnabled.collectAsState()
     val lowTemperature by settingsVm.lowTemperature.collectAsState()
     val highTemperature by settingsVm.highTemperature.collectAsState()
+    val refreshSettings by settingsVm.refreshSettings.collectAsState()
     val lastUpdated by reliabilityVm.lastUpdated.collectAsState()
     val context = LocalContext.current
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -89,15 +92,23 @@ fun HomeAppsScreen(
             syncAllMsg = "Refreshing home apps..."
             scope.launch {
                 try {
-                    val jobs = mutableListOf<Job>()
-                    jobs += mealVm.sync()
-                    jobs += haveVm.refresh()
-                    jobs += todoVm.syncFromApi()
-                    jobs += workoutVm.syncFromApi()
-                    jobs += gameWithDaveVm.refresh()
-                    jobs += sophonVm.refresh(sophonUrl)
-                    jobs.joinAll()
+                    val jobs = linkedMapOf(
+                        "meal_planner" to mealVm.sync(),
+                        "have_we_got" to haveVm.refresh(),
+                        "todo" to todoVm.syncFromApi(),
+                        "workout" to workoutVm.syncFromApi(),
+                        "gamewithdave" to gameWithDaveVm.refresh(),
+                        "sophon" to sophonVm.refresh(sophonUrl)
+                    )
+                    val timedOut = jobs.map { (id, job) ->
+                        async {
+                            val finished = withTimeoutOrNull(20_000) { job.join(); true } ?: false
+                            if (!finished) job.cancel()
+                            id to !finished
+                        }
+                    }.awaitAll().filter { it.second }.map { it.first }.toSet()
                     val failures = buildSet {
+                        addAll(timedOut)
                         if (mealVm.lastError.value != null) add("meal_planner")
                         if (haveVm.error.value != null) add("have_we_got")
                         if (todoVm.lastError.value != null) add("todo")
@@ -135,6 +146,14 @@ fun HomeAppsScreen(
             }
         }
     }
+    val latestSyncAll by rememberUpdatedState(syncAll)
+    LaunchedEffect(refreshSettings.enabled, refreshSettings.intervalMinutes) {
+        if (!refreshSettings.enabled) return@LaunchedEffect
+        while (true) {
+            delay(normalizeRefreshInterval(refreshSettings.intervalMinutes) * 60_000L)
+            latestSyncAll()
+        }
+    }
     val pullRefreshState = rememberPullRefreshState(syncingAll, syncAll)
 
     fun tracked(id: String, open: () -> Unit): () -> Unit = {
@@ -152,40 +171,50 @@ fun HomeAppsScreen(
         HomeCard(
             id = "meal_planner",
             healthy = serviceStatus("meal_planner"),
+            refreshing = syncingAll,
             updatedAt = lastUpdated["meal_planner"],
             title = "Meal Planner",
+            onRetry = syncAll,
             icon = { Icon(Icons.Filled.Restaurant, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("meal_planner", onOpenMealPlanner)
         ),
         HomeCard(
             id = "have_we_got",
             healthy = serviceStatus("have_we_got"),
+            refreshing = syncingAll,
             updatedAt = lastUpdated["have_we_got"],
             title = "Have We Got",
+            onRetry = syncAll,
             icon = { Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("have_we_got", onOpenHaveWeGot)
         ),
         HomeCard(
             id = "todo",
             healthy = serviceStatus("todo"),
+            refreshing = syncingAll,
             updatedAt = lastUpdated["todo"],
             title = "To-Do",
+            onRetry = syncAll,
             icon = { Icon(Icons.Filled.Checklist, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("todo", onOpenTodo)
         ),
         HomeCard(
             id = "workout",
             healthy = serviceStatus("workout"),
+            refreshing = syncingAll,
             updatedAt = lastUpdated["workout"],
             title = "Workout Log",
+            onRetry = syncAll,
             icon = { Icon(Icons.Filled.FitnessCenter, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("workout", onOpenWorkoutLog)
         ),
         HomeCard(
             id = "gamewithdave",
             healthy = serviceStatus("gamewithdave"),
+            refreshing = syncingAll,
             updatedAt = lastUpdated["gamewithdave"],
             title = "GameWithDave",
+            onRetry = syncAll,
             icon = { Icon(Icons.Filled.EventAvailable, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("gamewithdave", onOpenGameWithDave)
         ),
@@ -204,8 +233,10 @@ fun HomeAppsScreen(
         HomeCard(
             id = "sophon",
             healthy = serviceStatus("sophon"),
+            refreshing = syncingAll,
             updatedAt = lastUpdated["sophon"],
             title = "Sophon",
+            onRetry = syncAll,
             icon = { Icon(Icons.Filled.Movie, contentDescription = null, modifier = Modifier.size(24.dp)) },
             onClick = tracked("sophon", onOpenSophon)
         ),
@@ -304,9 +335,11 @@ private fun HomeAppsGrid(cards: List<HomeCard>, accent: Color, modifier: Modifie
                 title = card.title,
                 accent = accent,
                 healthy = card.healthy,
+                refreshing = card.refreshing,
                 updatedAt = card.updatedAt,
                 icon = card.icon,
                 onClick = card.onClick,
+                onRetry = card.onRetry,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp)
@@ -323,7 +356,9 @@ fun HomeAppCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     healthy: Boolean? = null,
-    updatedAt: Long? = null
+    updatedAt: Long? = null,
+    refreshing: Boolean = false,
+    onRetry: (() -> Unit)? = null
 ) {
     val cardBg = Color(0xFF222222)
     val shape = RoundedCornerShape(10.dp)
@@ -348,19 +383,30 @@ fun HomeAppCard(
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(text = title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    updatedAt?.let {
+                    val displayState = serviceDisplayState(refreshing, healthy, updatedAt != null)
+                    if (displayState != ServiceDisplayState.NotChecked) {
                         Text(
-                            text = "${if (healthy == true) "Updated" else "Cached"} ${formatRefreshTime(it)}",
+                            text = when (displayState) {
+                                ServiceDisplayState.Refreshing -> "Refreshing..."
+                                ServiceDisplayState.Live -> "Live ${updatedAt?.let(::formatRefreshTime).orEmpty()}"
+                                ServiceDisplayState.Cached -> "Cached ${updatedAt?.let(::formatRefreshTime).orEmpty()}"
+                                ServiceDisplayState.Unavailable -> "Unavailable"
+                                ServiceDisplayState.NotChecked -> ""
+                            }.trim(),
                             color = Color(0xFF777777),
                             fontSize = 10.sp
                         )
                     }
                 }
-                healthy?.let {
+                if (healthy == false && onRetry != null) {
+                    IconButton(onClick = onRetry, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Retry $title", tint = accent, modifier = Modifier.size(17.dp))
+                    }
+                } else if (healthy != null) {
                     Surface(
                         modifier = Modifier.size(7.dp),
                         shape = androidx.compose.foundation.shape.CircleShape,
-                        color = if (it) Color(0xFF7DB68A) else Color(0xFFE66A64)
+                        color = if (healthy) Color(0xFF7DB68A) else Color(0xFFE66A64)
                     ) {}
                 }
             }
@@ -371,10 +417,12 @@ fun HomeAppCard(
 private data class HomeCard(
     val id: String,
     val healthy: Boolean? = null,
+    val refreshing: Boolean = false,
     val updatedAt: Long? = null,
     val title: String,
     val icon: @Composable () -> Unit,
-    val onClick: () -> Unit
+    val onClick: () -> Unit,
+    val onRetry: (() -> Unit)? = null
 )
 
 private fun formatRefreshTime(epochMillis: Long): String =

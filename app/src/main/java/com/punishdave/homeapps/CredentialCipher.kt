@@ -22,13 +22,24 @@ object CredentialCipher {
 
     fun decrypt(value: String): String {
         if (!value.startsWith(Prefix)) return value
-        return runCatching {
+        return decryptEncrypted(value).getOrDefault("")
+    }
+
+    /** Returns the original encrypted value when it cannot be decrypted.
+     * This is intentionally safe for migrations: a temporary Keystore failure must never
+     * turn a stored credential into an empty string. */
+    fun migrate(value: String): String = when {
+        value.isEmpty() || value.startsWith(Prefix) -> value
+        else -> encrypt(value)
+    }
+
+    private fun decryptEncrypted(value: String): Result<String> = runCatching {
             val payload = Base64.decode(value.removePrefix(Prefix), Base64.NO_WRAP)
+            require(payload.size > 12) { "Invalid encrypted credential" }
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(128, payload.copyOfRange(0, 12)))
             String(cipher.doFinal(payload.copyOfRange(12, payload.size)))
-        }.getOrDefault("")
-    }
+        }
 
     private fun secretKey(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

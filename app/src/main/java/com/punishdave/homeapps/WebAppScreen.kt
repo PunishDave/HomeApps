@@ -3,6 +3,9 @@ package com.punishdave.homeapps
 import android.graphics.Bitmap
 import android.view.ViewGroup
 import android.webkit.HttpAuthHandler
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
@@ -24,11 +27,13 @@ fun WebAppScreen(
     url: String,
     username: String = "",
     password: String = "",
+    connectionLabel: String? = null,
     onBack: () -> Unit
 ) {
     var webView by androidx.compose.runtime.remember { mutableStateOf<WebView?>(null) }
     var loading by androidx.compose.runtime.remember { mutableStateOf(true) }
     var loadedRootUrl by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val currentUsername by androidx.compose.runtime.rememberUpdatedState(username)
     val currentPassword by androidx.compose.runtime.rememberUpdatedState(password)
 
@@ -52,7 +57,7 @@ fun WebAppScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            text = url,
+                            text = listOfNotNull(connectionLabel, url).joinToString(" · "),
                             color = Color(0xFF8D8D8D),
                             fontSize = 10.sp,
                             maxLines = 1
@@ -71,6 +76,23 @@ fun WebAppScreen(
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 loading = true
+                                errorMessage = null
+                            }
+
+                            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                                if (request?.isForMainFrame == true) {
+                                    loading = false
+                                    errorMessage = error?.description?.toString()?.ifBlank { null } ?: "This service is unavailable"
+                                    (view?.parent as? SwipeRefreshLayout)?.isRefreshing = false
+                                }
+                            }
+
+                            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?) {
+                                if (request?.isForMainFrame == true && (response?.statusCode ?: 0) >= 400) {
+                                    loading = false
+                                    errorMessage = "The service returned HTTP ${response?.statusCode}"
+                                    (view?.parent as? SwipeRefreshLayout)?.isRefreshing = false
+                                }
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
@@ -93,6 +115,7 @@ fun WebAppScreen(
                         }
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
+                        settings.cacheMode = android.webkit.WebSettings.LOAD_CACHE_ELSE_NETWORK
                         loadUrl(url)
                         loadedRootUrl = url
                         webView = this
@@ -100,7 +123,7 @@ fun WebAppScreen(
                     refreshLayout.setColorSchemeColors(0xFFE66A64.toInt())
                     refreshLayout.setProgressBackgroundColorSchemeColor(0xFF222222.toInt())
                     refreshLayout.setOnChildScrollUpCallback { _, _ -> browser.canScrollVertically(-1) }
-                    refreshLayout.setOnRefreshListener { browser.reload() }
+                    refreshLayout.setOnRefreshListener { errorMessage = null; browser.reload() }
                     refreshLayout.addView(
                         browser,
                         ViewGroup.LayoutParams(
@@ -126,8 +149,27 @@ fun WebAppScreen(
                     trackColor = Color.Transparent
                 )
             }
+            errorMessage?.let { message ->
+                Surface(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    color = Color(0xFF242424),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text("Service unavailable", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(message, color = Color(0xFFBDBDBD), fontSize = 13.sp)
+                        Button(
+                            onClick = { errorMessage = null; webView?.reload() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE66A64))
+                        ) { Text("Retry") }
+                    }
+                }
+            }
         }
     }
 }
-
 

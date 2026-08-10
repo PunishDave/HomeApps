@@ -22,8 +22,8 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = GameWithDaveRepository()
     val accessKey = store.accessKeyFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val username = store.usernameFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "")
-    private val _dashboard = MutableStateFlow(GameWithDaveDashboard())
-    val dashboard: StateFlow<GameWithDaveDashboard> = _dashboard
+    val dashboard: StateFlow<GameWithDaveDashboard> = store.dashboardFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, GameWithDaveDashboard())
     val isLoading = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
 
@@ -34,7 +34,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         message.value = null
         try {
             val key = storedAccessKey()
-            _dashboard.value = repository.dashboard(key ?: error("Add the GameWithDave access key in Settings."))
+            store.saveDashboard(repository.dashboard(key ?: error("Add the GameWithDave access key in Settings.")))
         } catch (error: Exception) {
             message.value = error.message ?: "Unable to load GameWithDave"
         } finally {
@@ -71,7 +71,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         try {
             message.value = block()
             val key = storedAccessKey()
-            _dashboard.value = repository.dashboard(key ?: error("Add the GameWithDave access key in Settings."))
+            store.saveDashboard(repository.dashboard(key ?: error("Add the GameWithDave access key in Settings.")))
         } catch (error: Exception) {
             message.value = error.message ?: "Update failed"
         } finally {

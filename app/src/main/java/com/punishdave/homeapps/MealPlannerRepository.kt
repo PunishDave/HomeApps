@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 import retrofit2.HttpException
+import kotlinx.coroutines.flow.first
 
 class MealPlannerRepository(
     private val store: MealPlannerStore,
@@ -54,6 +55,19 @@ class MealPlannerRepository(
         val plannedFetched = fetchWeekForCandidates(today.plusDays(7), ts) { store.savePlannedWeek(it) }
         if (!plannedFetched) {
             store.clearPlannedWeek()
+        }
+    }
+
+    /** Refreshes remote caches without replacing a locally generated week awaiting review. */
+    suspend fun refreshInBackground() {
+        val ts = System.currentTimeMillis()
+        store.saveRecipes(api.getRecipes(ts))
+        val today = LocalDate.now()
+        if (!fetchWeekForCandidates(today, ts) { store.saveCurrentWeek(it) }) {
+            store.clearCurrentWeek()
+        }
+        if (store.plannedWeekFlow.first() == null) {
+            fetchWeekForCandidates(today.plusDays(7), ts) { store.savePlannedWeek(it) }
         }
     }
 

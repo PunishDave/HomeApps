@@ -154,7 +154,12 @@ class MainActivity : FragmentActivity() {
                                 CircularProgressIndicator(color = Color(0xFFE66A64))
                             }
                         } else {
-                            WebAppScreen("Sophon", sophonUrl) { navController.popBackStack() }
+                            WebAppScreen(
+                                title = "Sophon",
+                                url = sophonUrl,
+                                connectionLabel = sophonConnectionLabel(sophonUrl),
+                                onBack = { navController.popBackStack() }
+                            )
                         }
                     }
                     composable(Route.Droplet.id) {

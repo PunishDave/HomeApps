@@ -2,6 +2,9 @@ package com.punishdave.homeapps
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -34,7 +37,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.Credentials
 import okhttp3.Request
 
-private val Context.webSettingsDataStore by preferencesDataStore(name = "web_app_settings")
+internal val Context.webSettingsDataStore by preferencesDataStore(name = "web_app_settings")
+internal val sophonUrlPreferenceKey = stringPreferencesKey("sophon_url")
 
 class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val context = app.applicationContext
@@ -42,10 +46,10 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val todoStore = ToDoStore(context)
     private val workoutStore = WorkoutStore(context)
     private val gameWithDaveStore = GameWithDaveStore(context)
+    private val refreshSettingsStore = RefreshSettingsStore(context)
 
     private val transmissionUserKey = stringPreferencesKey("transmission_username")
     private val transmissionPasswordKey = stringPreferencesKey("transmission_password")
-    private val sophonUrlKey = stringPreferencesKey("sophon_url")
     private val notificationsKey = booleanPreferencesKey("notifications_enabled")
     private val biometricKey = booleanPreferencesKey("biometric_settings_enabled")
     private val gameNotificationsKey = booleanPreferencesKey("game_notifications_enabled")
@@ -68,8 +72,10 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         .map { CredentialCipher.decrypt(it[transmissionPasswordKey] ?: "") }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val sophonUrl = context.webSettingsDataStore.data
-        .map { it[sophonUrlKey] ?: "http://192.168.0.234:8096" }
+        .map { it[sophonUrlPreferenceKey] ?: "http://192.168.0.234:8096" }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+    val refreshSettings = refreshSettingsStore.settings
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RefreshSettings())
     val notificationsEnabled = context.webSettingsDataStore.data
         .map { it[notificationsKey] ?: false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -97,17 +103,57 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     init {
-        viewModelScope.launch {
-            mealStore.saveAccessKey(mealStore.accessKeyFlow.first())
-            todoStore.saveAccessKey(todoStore.accessKeyFlow.first())
-            workoutStore.saveAccessKey(workoutStore.accessKeyFlow.first())
-            gameWithDaveStore.saveAccessKey(gameWithDaveStore.accessKeyFlow.first())
-            gameWithDaveStore.saveCredentials(gameWithDaveStore.usernameFlow.first(), gameWithDaveStore.passwordFlow.first())
-            context.webSettingsDataStore.edit {
-                it[transmissionUserKey] = CredentialCipher.encrypt(CredentialCipher.decrypt(it[transmissionUserKey] ?: ""))
-                it[transmissionPasswordKey] = CredentialCipher.encrypt(CredentialCipher.decrypt(it[transmissionPasswordKey] ?: ""))
-            }
+        // Credentials are encrypted when explicitly saved. Never rewrite them during startup:
+        // if Android Keystore is briefly unavailable, doing so could replace valid data with blanks.
+    }
+
+    fun exportBackup(uri: Uri, password: String) = viewModelScope.launch {
+        saveStatus = runCatching {
+            require(password.length >= 8) { "Use at least 8 characters for the backup password" }
+            val backup = SettingsBackup(
+                mealKey.first(), todoKey.first(), todoCategory.first(), todoHabit.first(),
+                workoutKey.first(), gameWithDaveKey.first(), gameWithDaveUsername.first(),
+                gameWithDavePassword.first(), sophonUrl.first(), transmissionUsername.first(),
+                transmissionPassword.first(), notificationsEnabled.first(), biometricEnabled.first(),
+                gameNotificationsEnabled.first(), temperatureNotificationsEnabled.first(),
+                lowTemperature.first(), highTemperature.first(), refreshSettings.first().enabled,
+                refreshSettings.first().backgroundEnabled, refreshSettings.first().intervalMinutes
+            )
+            val encrypted = withContext(Dispatchers.Default) { SettingsBackupCodec.encode(backup, password) }
+            context.contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use { it.write(encrypted) }
+            "Encrypted backup saved"
+        }.getOrElse { it.message ?: "Could not save backup" }
+    }
+
+    fun importBackup(uri: Uri, password: String) = viewModelScope.launch {
+        saveStatus = runCatching {
+            val encrypted = context.contentResolver.openInputStream(uri)!!.bufferedReader().use { it.readText() }
+            val backup = withContext(Dispatchers.Default) { SettingsBackupCodec.decode(encrypted, password) }
+            saveNow(backup)
+            "Settings restored. Reopen Settings to refresh the fields"
+        }.getOrElse { "Could not restore backup. Check the file and password" }
+    }
+
+    private suspend fun saveNow(value: SettingsBackup) {
+        mealStore.saveAccessKey(value.mealKey)
+        todoStore.saveAccessKey(value.todoKey)
+        todoStore.saveCategory(value.todoCategory)
+        todoStore.saveHabit(value.todoHabit)
+        workoutStore.saveAccessKey(value.workoutKey)
+        gameWithDaveStore.saveAccessKey(value.gameWithDaveKey)
+        gameWithDaveStore.saveCredentials(value.gameWithDaveUsername, value.gameWithDavePassword)
+        context.webSettingsDataStore.edit {
+            it[sophonUrlPreferenceKey] = value.sophonUrl
+            it[transmissionUserKey] = CredentialCipher.encrypt(value.transmissionUsername)
+            it[transmissionPasswordKey] = CredentialCipher.encrypt(value.transmissionPassword)
+            it[notificationsKey] = value.notificationsEnabled
+            it[biometricKey] = value.biometricEnabled
+            it[gameNotificationsKey] = value.gameNotificationsEnabled
+            it[temperatureNotificationsKey] = value.temperatureNotificationsEnabled
+            it[lowTemperatureKey] = value.lowTemperature
+            it[highTemperatureKey] = value.highTemperature
         }
+        refreshSettingsStore.save(RefreshSettings(value.automaticRefreshEnabled, value.backgroundRefreshEnabled, value.refreshIntervalMinutes))
     }
 
     fun save(
@@ -127,7 +173,10 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         gameNotificationsEnabled: Boolean,
         temperatureNotificationsEnabled: Boolean,
         lowTemperature: String,
-        highTemperature: String
+        highTemperature: String,
+        automaticRefreshEnabled: Boolean,
+        backgroundRefreshEnabled: Boolean,
+        refreshIntervalMinutes: Int
     ) = viewModelScope.launch {
         mealStore.saveAccessKey(mealKey.trim())
         todoStore.saveAccessKey(todoKey.trim())
@@ -137,7 +186,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         gameWithDaveStore.saveAccessKey(gameWithDaveKey.trim())
         gameWithDaveStore.saveCredentials(gameWithDaveUsername.trim(), gameWithDavePassword)
         context.webSettingsDataStore.edit {
-            it[sophonUrlKey] = sophonUrl.trim().ifBlank { "http://192.168.0.234:8096" }
+            it[sophonUrlPreferenceKey] = sophonUrl.trim().ifBlank { "http://192.168.0.234:8096" }
             it[transmissionUserKey] = CredentialCipher.encrypt(transmissionUsername.trim())
             it[transmissionPasswordKey] = CredentialCipher.encrypt(transmissionPassword)
             it[notificationsKey] = notificationsEnabled
@@ -147,6 +196,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
             it[lowTemperatureKey] = lowTemperature
             it[highTemperatureKey] = highTemperature
         }
+        refreshSettingsStore.save(RefreshSettings(automaticRefreshEnabled, backgroundRefreshEnabled, refreshIntervalMinutes))
         saveStatus = "Settings saved"
     }
 
@@ -219,6 +269,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val storedTemperatureNotificationsEnabled by vm.temperatureNotificationsEnabled.collectAsState()
     val storedLowTemperature by vm.lowTemperature.collectAsState()
     val storedHighTemperature by vm.highTemperature.collectAsState()
+    val storedRefreshSettings by vm.refreshSettings.collectAsState()
 
     var mealKey by rememberSaveable(storedMealKey) { mutableStateOf(storedMealKey) }
     var todoKey by rememberSaveable(storedTodoKey) { mutableStateOf(storedTodoKey) }
@@ -237,6 +288,52 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     var temperatureNotificationsEnabled by rememberSaveable(storedTemperatureNotificationsEnabled) { mutableStateOf(storedTemperatureNotificationsEnabled) }
     var lowTemperature by rememberSaveable(storedLowTemperature) { mutableStateOf(storedLowTemperature) }
     var highTemperature by rememberSaveable(storedHighTemperature) { mutableStateOf(storedHighTemperature) }
+    var automaticRefreshEnabled by rememberSaveable(storedRefreshSettings.enabled) { mutableStateOf(storedRefreshSettings.enabled) }
+    var backgroundRefreshEnabled by rememberSaveable(storedRefreshSettings.backgroundEnabled) { mutableStateOf(storedRefreshSettings.backgroundEnabled) }
+    var refreshIntervalMinutes by rememberSaveable(storedRefreshSettings.intervalMinutes) { mutableIntStateOf(storedRefreshSettings.intervalMinutes) }
+    var backupPassword by rememberSaveable { mutableStateOf("") }
+    var backupAction by remember { mutableStateOf<BackupAction?>(null) }
+    var importUri by remember { mutableStateOf<Uri?>(null) }
+    val createBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) vm.exportBackup(uri, backupPassword)
+        backupPassword = ""
+        backupAction = null
+    }
+    val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            importUri = uri
+            backupPassword = ""
+            backupAction = BackupAction.Import
+        }
+    }
+
+    backupAction?.let { action ->
+        AlertDialog(
+            onDismissRequest = { backupAction = null; backupPassword = "" },
+            title = { Text(if (action == BackupAction.Export) "Protect backup" else "Unlock backup") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (action == BackupAction.Export) "Choose a password with at least 8 characters. You will need it to restore this file." else "Enter the password used when this backup was created.")
+                    SecureSettingsField("Backup password", backupPassword) { backupPassword = it }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = backupPassword.length >= 8,
+                    onClick = {
+                        if (action == BackupAction.Export) {
+                            createBackup.launch("homeapps-settings.hab")
+                        } else {
+                            importUri?.let { vm.importBackup(it, backupPassword) }
+                            backupAction = null
+                            backupPassword = ""
+                        }
+                    }
+                ) { Text(if (action == BackupAction.Export) "Choose location" else "Restore") }
+            },
+            dismissButton = { TextButton(onClick = { backupAction = null; backupPassword = "" }) { Text("Cancel") } }
+        )
+    }
 
     Surface(Modifier.fillMaxSize(), color = Color(0xFF1C1C1C)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -296,6 +393,18 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 }
                 item { Spacer(Modifier.height(6.dp)); SettingsHeading("Home services") }
                 item { SettingsField("Sophon URL", sophonUrl) { sophonUrl = it } }
+                item { Spacer(Modifier.height(6.dp)); SettingsHeading("Automatic refresh") }
+                item { SettingsToggle("Refresh automatically", "Keep native app information up to date", automaticRefreshEnabled) { automaticRefreshEnabled = it } }
+                if (automaticRefreshEnabled) {
+                    item { RefreshIntervalDropdown(refreshIntervalMinutes) { refreshIntervalMinutes = it } }
+                    item {
+                        SettingsToggle(
+                            "Refresh in background",
+                            "Android may delay refreshes to protect battery",
+                            backgroundRefreshEnabled
+                        ) { backgroundRefreshEnabled = it }
+                    }
+                }
                 item { Spacer(Modifier.height(6.dp)); SettingsHeading("Transmission") }
                 item { SettingsField("Username", transmissionUsername) { transmissionUsername = it } }
                 item {
@@ -322,17 +431,70 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 item {
                     Button(
                         onClick = {
-                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, gameWithDaveKey, gameWithDaveUsername, gameWithDavePassword, sophonUrl, transmissionUsername, transmissionPassword, notificationsEnabled, biometricEnabled, gameNotificationsEnabled, temperatureNotificationsEnabled, lowTemperature, highTemperature)
+                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, gameWithDaveKey, gameWithDaveUsername, gameWithDavePassword, sophonUrl, transmissionUsername, transmissionPassword, notificationsEnabled, biometricEnabled, gameNotificationsEnabled, temperatureNotificationsEnabled, lowTemperature, highTemperature, automaticRefreshEnabled, backgroundRefreshEnabled, refreshIntervalMinutes)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE66A64))
                     ) { Text("Save settings") }
+                }
+                item { Spacer(Modifier.height(6.dp)); SettingsHeading("Backup and restore") }
+                item {
+                    Text(
+                        "Credentials are included in an encrypted file protected by the password you choose.",
+                        color = Color(0xFF8D8D8D),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = { backupPassword = ""; backupAction = BackupAction.Export },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Export") }
+                        OutlinedButton(
+                            onClick = { openBackup.launch(arrayOf("application/octet-stream", "text/plain", "*/*")) },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Restore") }
+                    }
                 }
                 vm.saveStatus?.let { status -> item { Text(status, color = Color(0xFF9AD6A3)) } }
                 item { Spacer(Modifier.height(24.dp)) }
             }
         }
     }
+}
+
+private enum class BackupAction { Export, Import }
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun RefreshIntervalDropdown(value: Int, onChange: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+        OutlinedTextField(
+            value = refreshIntervalLabel(value),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Refresh frequency") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            refreshIntervalOptions.forEach { minutes ->
+                DropdownMenuItem(
+                    text = { Text(refreshIntervalLabel(minutes)) },
+                    onClick = { onChange(minutes); expanded = false }
+                )
+            }
+        }
+    }
+}
+
+fun refreshIntervalLabel(minutes: Int): String = when {
+    minutes < 60 -> "Every $minutes minutes"
+    minutes == 60 -> "Every hour"
+    minutes % 60 == 0 -> "Every ${minutes / 60} hours"
+    else -> "Every $minutes minutes"
 }
 
 @Composable
