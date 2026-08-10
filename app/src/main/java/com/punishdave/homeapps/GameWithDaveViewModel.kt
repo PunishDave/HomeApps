@@ -19,6 +19,7 @@ private val gameWithDaveDateFormatter = DateTimeFormatter.ofPattern("dd-MM-uuuu"
 
 class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
     private val store = GameWithDaveStore(app.applicationContext)
+    private val repository = GameWithDaveRepository()
     val accessKey = store.accessKeyFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     val username = store.usernameFlow.stateIn(viewModelScope, SharingStarted.Eagerly, "")
     private val _dashboard = MutableStateFlow(GameWithDaveDashboard())
@@ -33,7 +34,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         message.value = null
         try {
             val key = storedAccessKey()
-            _dashboard.value = Network.gameWithDaveApi.dashboard(key, key?.let { "Bearer $it" })
+            _dashboard.value = repository.dashboard(key ?: error("Add the GameWithDave access key in Settings."))
         } catch (error: Exception) {
             message.value = error.message ?: "Unable to load GameWithDave"
         } finally {
@@ -48,12 +49,10 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
             val secret = store.passwordFlow.first().ifEmpty { throw IllegalStateException("Add your GameWithDave password in Settings.") }
             val apiStartDate = LocalDate.parse(startDate, gameWithDaveDateFormatter).toString()
             val apiEndDate = LocalDate.parse(endDate, gameWithDaveDateFormatter).toString()
-            Network.gameWithDaveApi.saveAvailability(
-                key,
-                key?.let { "Bearer $it" },
-                key,
+            repository.saveAvailability(
+                key ?: error("Add the GameWithDave access key in Settings."),
                 GameWithDaveAvailabilityRequest(role, apiStartDate, apiEndDate, status, secret)
-            ).message
+            )
         }
     }
 
@@ -61,14 +60,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         runUpdate {
             val key = storedAccessKey()
             val secret = store.passwordFlow.first()
-            Network.gameWithDaveApi.updateNight(
-                night.date,
-                night.team,
-                key,
-                key?.let { "Bearer $it" },
-                key,
-                GameWithDaveNightUpdateRequest(action, secret)
-            )
+            repository.updateNight(key ?: error("Add the GameWithDave access key in Settings."), night, action, secret)
             "Game night updated"
         }
     }
@@ -79,7 +71,7 @@ class GameWithDaveViewModel(app: Application) : AndroidViewModel(app) {
         try {
             message.value = block()
             val key = storedAccessKey()
-            _dashboard.value = Network.gameWithDaveApi.dashboard(key, key?.let { "Bearer $it" })
+            _dashboard.value = repository.dashboard(key ?: error("Add the GameWithDave access key in Settings."))
         } catch (error: Exception) {
             message.value = error.message ?: "Update failed"
         } finally {

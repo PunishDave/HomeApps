@@ -6,16 +6,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertIsOn
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
 
 class HomeDashboardUiTest {
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
     fun todayOverviewShowsTasksAndFriendlySensors() {
@@ -57,5 +64,39 @@ class HomeDashboardUiTest {
         compose.onNodeWithText("September").assertIsDisplayed()
         compose.runOnIdle { replaceDays?.invoke() }
         compose.onNodeWithText("September").assertIsDisplayed()
+    }
+
+    @Test
+    fun cachedCardAndSettingsToggleExposeTheirState() {
+        compose.setContent {
+            MaterialTheme {
+                androidx.compose.foundation.layout.Column {
+                    HomeAppCard(
+                        title = "To-Do",
+                        accent = androidx.compose.ui.graphics.Color.Red,
+                        icon = { Text("T") },
+                        onClick = {},
+                        healthy = false,
+                        updatedAt = 1_786_300_800_000,
+                        modifier = Modifier.fillMaxWidth().height(72.dp)
+                    )
+                    SettingsToggle("Temperature alerts", "Notify outside range", true) {}
+                }
+            }
+        }
+
+        compose.onNodeWithText("To-Do").assertIsDisplayed()
+        compose.onNodeWithText("Cached", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Temperature alerts").assertIsDisplayed()
+        compose.onNode(androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ToggleableState, androidx.compose.ui.state.ToggleableState.On)).assertIsOn()
+    }
+
+    @Test
+    fun gameStatusDropdownOffersAllChoices() {
+        compose.setContent { MaterialTheme { StatusDropdown("yes") {} } }
+
+        compose.onNodeWithText("Available").performClick()
+        compose.onNodeWithText("Tentative").assertIsDisplayed()
+        compose.onNodeWithText("Not available").assertIsDisplayed()
     }
 }

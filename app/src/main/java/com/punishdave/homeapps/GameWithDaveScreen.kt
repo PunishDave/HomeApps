@@ -335,7 +335,7 @@ private fun showGameWithDaveDatePicker(
 }
 
 @Composable
-private fun StatusDropdown(value: String, onSelect: (String) -> Unit) {
+fun StatusDropdown(value: String, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val options = listOf(
         "yes" to "Available",
