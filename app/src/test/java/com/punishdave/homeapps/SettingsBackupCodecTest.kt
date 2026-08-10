@@ -15,7 +15,8 @@ class SettingsBackupCodecTest {
         notificationsEnabled = true,
         automaticRefreshEnabled = true,
         backgroundRefreshEnabled = true,
-        refreshIntervalMinutes = 60
+        refreshIntervalMinutes = 60,
+        unmeteredOnly = true
     )
 
     @Test

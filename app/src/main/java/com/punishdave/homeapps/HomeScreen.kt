@@ -86,7 +86,7 @@ fun HomeAppsScreen(
     var refreshedServices by remember { mutableStateOf<Set<String>>(emptySet()) }
     var failedServices by remember { mutableStateOf<Set<String>>(emptySet()) }
     val scope = rememberCoroutineScope()
-    val syncAll: () -> Unit = {
+    val performSyncAll: (Boolean) -> Unit = { automatic ->
         if (!syncingAll) {
             syncingAll = true
             syncAllMsg = "Refreshing home apps..."
@@ -120,6 +120,7 @@ fun HomeAppsScreen(
                     refreshedServices = setOf("meal_planner", "have_we_got", "todo", "workout", "gamewithdave", "sophon")
                     val successful = refreshedServices - failures
                     reliabilityVm.markUpdated(successful)
+                    if (automatic) settingsVm.recordAutomaticRefresh(successful, failures)
                     syncAllMsg = if (failures.isEmpty()) "Up to date" else "${failures.size} service${if (failures.size == 1) "" else "s"} need attention"
                     if (notificationsEnabled) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -146,12 +147,13 @@ fun HomeAppsScreen(
             }
         }
     }
-    val latestSyncAll by rememberUpdatedState(syncAll)
+    val syncAll: () -> Unit = { performSyncAll(false) }
+    val latestSyncAll by rememberUpdatedState(performSyncAll)
     LaunchedEffect(refreshSettings.enabled, refreshSettings.intervalMinutes) {
         if (!refreshSettings.enabled) return@LaunchedEffect
         while (true) {
             delay(normalizeRefreshInterval(refreshSettings.intervalMinutes) * 60_000L)
-            latestSyncAll()
+            latestSyncAll(true)
         }
     }
     val pullRefreshState = rememberPullRefreshState(syncingAll, syncAll)

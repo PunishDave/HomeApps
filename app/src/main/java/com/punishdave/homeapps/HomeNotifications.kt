@@ -34,5 +34,5 @@ fun notifyHome(context: Context, id: Int, title: String, text: String, route: St
         .setAutoCancel(true)
         .setContentIntent(contentIntent)
         .build()
-    context.getSystemService(NotificationManager::class.java).notify(id, notification)
+    runCatching { context.getSystemService(NotificationManager::class.java).notify(id, notification) }
 }

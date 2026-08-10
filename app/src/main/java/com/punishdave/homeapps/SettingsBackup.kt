@@ -31,7 +31,8 @@ data class SettingsBackup(
     val highTemperature: String = "25",
     val automaticRefreshEnabled: Boolean = false,
     val backgroundRefreshEnabled: Boolean = true,
-    val refreshIntervalMinutes: Int = 30
+    val refreshIntervalMinutes: Int = 30,
+    val unmeteredOnly: Boolean = false
 )
 
 object SettingsBackupCodec {

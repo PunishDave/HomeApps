@@ -76,6 +76,8 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
     val refreshSettings = refreshSettingsStore.settings
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RefreshSettings())
+    val refreshHistory = refreshSettingsStore.history
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RefreshRunInfo())
     val notificationsEnabled = context.webSettingsDataStore.data
         .map { it[notificationsKey] ?: false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -117,7 +119,8 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
                 transmissionPassword.first(), notificationsEnabled.first(), biometricEnabled.first(),
                 gameNotificationsEnabled.first(), temperatureNotificationsEnabled.first(),
                 lowTemperature.first(), highTemperature.first(), refreshSettings.first().enabled,
-                refreshSettings.first().backgroundEnabled, refreshSettings.first().intervalMinutes
+                refreshSettings.first().backgroundEnabled, refreshSettings.first().intervalMinutes,
+                refreshSettings.first().unmeteredOnly
             )
             val encrypted = withContext(Dispatchers.Default) { SettingsBackupCodec.encode(backup, password) }
             context.contentResolver.openOutputStream(uri, "wt")!!.bufferedWriter().use { it.write(encrypted) }
@@ -153,7 +156,7 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
             it[lowTemperatureKey] = value.lowTemperature
             it[highTemperatureKey] = value.highTemperature
         }
-        refreshSettingsStore.save(RefreshSettings(value.automaticRefreshEnabled, value.backgroundRefreshEnabled, value.refreshIntervalMinutes))
+        refreshSettingsStore.save(RefreshSettings(value.automaticRefreshEnabled, value.backgroundRefreshEnabled, value.refreshIntervalMinutes, value.unmeteredOnly))
     }
 
     fun save(
@@ -176,7 +179,8 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
         highTemperature: String,
         automaticRefreshEnabled: Boolean,
         backgroundRefreshEnabled: Boolean,
-        refreshIntervalMinutes: Int
+        refreshIntervalMinutes: Int,
+        unmeteredOnly: Boolean
     ) = viewModelScope.launch {
         mealStore.saveAccessKey(mealKey.trim())
         todoStore.saveAccessKey(todoKey.trim())
@@ -196,8 +200,12 @@ class AppSettingsViewModel(app: Application) : AndroidViewModel(app) {
             it[lowTemperatureKey] = lowTemperature
             it[highTemperatureKey] = highTemperature
         }
-        refreshSettingsStore.save(RefreshSettings(automaticRefreshEnabled, backgroundRefreshEnabled, refreshIntervalMinutes))
+        refreshSettingsStore.save(RefreshSettings(automaticRefreshEnabled, backgroundRefreshEnabled, refreshIntervalMinutes, unmeteredOnly))
         saveStatus = "Settings saved"
+    }
+
+    fun recordAutomaticRefresh(successful: Set<String>, failed: Set<String>) = viewModelScope.launch {
+        refreshSettingsStore.record("Foreground", successful, failed)
     }
 
     fun testConnections(
@@ -270,6 +278,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     val storedLowTemperature by vm.lowTemperature.collectAsState()
     val storedHighTemperature by vm.highTemperature.collectAsState()
     val storedRefreshSettings by vm.refreshSettings.collectAsState()
+    val refreshHistory by vm.refreshHistory.collectAsState()
 
     var mealKey by rememberSaveable(storedMealKey) { mutableStateOf(storedMealKey) }
     var todoKey by rememberSaveable(storedTodoKey) { mutableStateOf(storedTodoKey) }
@@ -291,6 +300,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
     var automaticRefreshEnabled by rememberSaveable(storedRefreshSettings.enabled) { mutableStateOf(storedRefreshSettings.enabled) }
     var backgroundRefreshEnabled by rememberSaveable(storedRefreshSettings.backgroundEnabled) { mutableStateOf(storedRefreshSettings.backgroundEnabled) }
     var refreshIntervalMinutes by rememberSaveable(storedRefreshSettings.intervalMinutes) { mutableIntStateOf(storedRefreshSettings.intervalMinutes) }
+    var unmeteredOnly by rememberSaveable(storedRefreshSettings.unmeteredOnly) { mutableStateOf(storedRefreshSettings.unmeteredOnly) }
     var backupPassword by rememberSaveable { mutableStateOf("") }
     var backupAction by remember { mutableStateOf<BackupAction?>(null) }
     var importUri by remember { mutableStateOf<Uri?>(null) }
@@ -404,6 +414,10 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                             backgroundRefreshEnabled
                         ) { backgroundRefreshEnabled = it }
                     }
+                    if (backgroundRefreshEnabled) {
+                        item { SettingsToggle("Wi-Fi only", "Do not refresh over mobile data", unmeteredOnly) { unmeteredOnly = it } }
+                    }
+                    item { AutomaticRefreshHistory(refreshHistory, backgroundRefreshEnabled) }
                 }
                 item { Spacer(Modifier.height(6.dp)); SettingsHeading("Transmission") }
                 item { SettingsField("Username", transmissionUsername) { transmissionUsername = it } }
@@ -431,7 +445,7 @@ fun AppSettingsScreen(onBack: () -> Unit) {
                 item {
                     Button(
                         onClick = {
-                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, gameWithDaveKey, gameWithDaveUsername, gameWithDavePassword, sophonUrl, transmissionUsername, transmissionPassword, notificationsEnabled, biometricEnabled, gameNotificationsEnabled, temperatureNotificationsEnabled, lowTemperature, highTemperature, automaticRefreshEnabled, backgroundRefreshEnabled, refreshIntervalMinutes)
+                            vm.save(mealKey, todoKey, todoCategory, todoHabit, workoutKey, gameWithDaveKey, gameWithDaveUsername, gameWithDavePassword, sophonUrl, transmissionUsername, transmissionPassword, notificationsEnabled, biometricEnabled, gameNotificationsEnabled, temperatureNotificationsEnabled, lowTemperature, highTemperature, automaticRefreshEnabled, backgroundRefreshEnabled, refreshIntervalMinutes, unmeteredOnly)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE66A64))
@@ -496,6 +510,41 @@ fun refreshIntervalLabel(minutes: Int): String = when {
     minutes % 60 == 0 -> "Every ${minutes / 60} hours"
     else -> "Every $minutes minutes"
 }
+
+@Composable
+private fun AutomaticRefreshHistory(history: RefreshRunInfo, backgroundEnabled: Boolean) {
+    Surface(color = Color(0xFF242424), shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Refresh activity", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Text(
+                history.completedAt?.let { "Last ${history.mode?.lowercase() ?: "automatic"} refresh: ${formatAutomaticRefreshTime(it)}" }
+                    ?: "No automatic refresh recorded yet",
+                color = Color(0xFFBDBDBD), style = MaterialTheme.typography.bodySmall
+            )
+            if (history.successful.isNotEmpty()) Text("Updated: ${friendlyServiceList(history.successful)}", color = Color(0xFF9AD6A3), style = MaterialTheme.typography.bodySmall)
+            if (history.failed.isNotEmpty()) Text("Unavailable: ${friendlyServiceList(history.failed)}", color = Color(0xFFFFB3B3), style = MaterialTheme.typography.bodySmall)
+            if (backgroundEnabled) history.nextExpectedAt?.let {
+                Text("Next background window: around ${formatAutomaticRefreshTime(it)}", color = Color(0xFF8D8D8D), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+private fun friendlyServiceList(ids: Set<String>): String = ids.sorted().joinToString { id ->
+    when (id) {
+        "meal_planner" -> "Meal Planner"
+        "todo" -> "To-Do"
+        "workout" -> "Workout"
+        "gamewithdave" -> "GameWithDave"
+        "sophon" -> "Sophon"
+        "have_we_got" -> "Have We Got"
+        else -> id
+    }
+}
+
+private fun formatAutomaticRefreshTime(epochMillis: Long): String =
+    java.time.format.DateTimeFormatter.ofPattern("dd MMM, HH:mm", java.util.Locale.UK)
+        .withZone(java.time.ZoneId.systemDefault()).format(java.time.Instant.ofEpochMilli(epochMillis))
 
 @Composable
 private fun SettingsHeading(text: String) {

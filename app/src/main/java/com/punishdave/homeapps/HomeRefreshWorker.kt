@@ -3,6 +3,8 @@ package com.punishdave.homeapps
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
@@ -13,6 +15,8 @@ class HomeRefreshWorker(
     appContext: Context,
     parameters: WorkerParameters
 ) : CoroutineWorker(appContext, parameters) {
+
+    private val attemptedServices = setOf("meal_planner", "todo", "workout", "gamewithdave", "sophon")
 
     override suspend fun doWork(): Result = runCatching {
         val successful = withTimeout(90_000) {
@@ -28,8 +32,41 @@ class HomeRefreshWorker(
             }
         }
         if (successful.isNotEmpty()) HomeReliabilityStore(applicationContext).markUpdated(successful)
+        RefreshSettingsStore(applicationContext).record("Background", successful, attemptedServices - successful)
+        sendBackgroundAlerts(successful)
         Result.success()
-    }.getOrElse { Result.retry() }
+    }.getOrElse {
+        RefreshSettingsStore(applicationContext).record("Background", emptySet(), attemptedServices)
+        Result.retry()
+    }
+
+    private suspend fun sendBackgroundAlerts(successful: Set<String>) {
+        val preferences = applicationContext.webSettingsDataStore.data.first()
+        if (preferences[booleanPreferencesKey("notifications_enabled")] != true) return
+        createHomeNotificationChannel(applicationContext)
+        val reliability = HomeReliabilityStore(applicationContext)
+        if ("gamewithdave" in successful && preferences[booleanPreferencesKey("game_notifications_enabled")] != false) {
+            GameWithDaveStore(applicationContext).dashboardFlow.first().days
+                .firstOrNull { day -> day.game_nights.any { it.status != "removed" } }
+                ?.let { day ->
+                    val active = day.game_nights.filter { it.status != "removed" }
+                    val fingerprint = day.date + ":" + active.joinToString { "${it.team}:${it.status}" }
+                    if (reliability.claimNotification("game", fingerprint)) {
+                        notifyGameNight(applicationContext, "Next game night: ${day.display_date}")
+                    }
+                }
+        }
+        if ("sophon" in successful && preferences[booleanPreferencesKey("temperature_notifications_enabled")] == true) {
+            val low = preferences[stringPreferencesKey("temperature_low_threshold")]?.toDoubleOrNull() ?: 8.0
+            val high = preferences[stringPreferencesKey("temperature_high_threshold")]?.toDoubleOrNull() ?: 25.0
+            SophonSummaryStore(applicationContext).summaryFlow.first()?.devices.orEmpty().forEachIndexed { index, device ->
+                val state = temperatureState(device, low, high)
+                if (reliability.updateTemperatureZone(state.deviceId, state.zone) && state.message != null) {
+                    notifyHome(applicationContext, 4200 + index, "Sophon temperature", state.message, "sophon")
+                }
+            }
+        }
+    }
 
     private suspend fun refreshMealPlanner(): Boolean {
         MealPlannerRepository(MealPlannerStore(applicationContext)).refreshInBackground()

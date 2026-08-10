@@ -17,4 +17,11 @@ class RefreshSettingsTest {
         assertEquals("Every hour", refreshIntervalLabel(60))
         assertEquals("Every 6 hours", refreshIntervalLabel(360))
     }
+
+    @Test
+    fun refreshDefaultsAllowBackgroundWithoutEnablingPolling() {
+        assertEquals(false, RefreshSettings().enabled)
+        assertEquals(true, RefreshSettings().backgroundEnabled)
+        assertEquals(false, RefreshSettings().unmeteredOnly)
+    }
 }
