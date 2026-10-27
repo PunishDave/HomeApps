@@ -36,33 +36,45 @@ class TodoRepository(
     suspend fun fetchFromApi(key: String): FetchResult {
         if (key.isBlank()) return FetchResult(emptyList(), "no key")
         return withContext(Dispatchers.IO) {
-            val url = Network.TODO_BASE.toHttpUrl().newBuilder()
-                .addPathSegment("items")
-                .addQueryParameter("per_page", "100")
-                .addQueryParameter("pd_todo_key", key)
-                .addQueryParameter("_ts", System.currentTimeMillis().toString())
-                .build()
+            val adapter = Network.moshi.adapter<List<TodoRemoteItem>>(
+                Types.newParameterizedType(List::class.java, TodoRemoteItem::class.java)
+            )
+            val items = mutableListOf<TodoItem>()
+            val debugParts = mutableListOf<String>()
+            var page = 1
+            var totalPages = 1
 
-            val request = Request.Builder()
-                .url(url)
-                .get()
-                .addHeader("X-PD-Todo-Key", key)
-                .addHeader("Cache-Control", "no-cache")
-                .addHeader("Pragma", "no-cache")
-                .build()
+            do {
+                val url = Network.TODO_BASE.toHttpUrl().newBuilder()
+                    .addPathSegment("items")
+                    .addQueryParameter("per_page", "100")
+                    .addQueryParameter("page", page.toString())
+                    .addQueryParameter("pd_todo_key", key)
+                    .addQueryParameter("_ts", System.currentTimeMillis().toString())
+                    .build()
 
-            Network.client.newCall(request).execute().use { resp ->
-                val body = resp.body?.string().orEmpty()
-                val debug = "url=${url}; status=${resp.code}; len=${body.length}; body=${body.take(200)}"
-                if (!resp.isSuccessful) {
-                    throw IOException("To-Do sync failed: HTTP ${resp.code}")
+                val request = Request.Builder()
+                    .url(url)
+                    .get()
+                    .addHeader("X-PD-Todo-Key", key)
+                    .addHeader("Cache-Control", "no-cache")
+                    .addHeader("Pragma", "no-cache")
+                    .build()
+
+                Network.client.newCall(request).execute().use { resp ->
+                    val body = resp.body?.string().orEmpty()
+                    debugParts += "page=$page status=${resp.code} len=${body.length}"
+                    if (!resp.isSuccessful) {
+                        throw IOException("To-Do sync failed: HTTP ${resp.code}")
+                    }
+                    totalPages = resp.header("X-WP-TotalPages")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                    val parsed = runCatching { adapter.fromJson(body) }.getOrNull().orEmpty()
+                    items += parsed.map { it.toLocal() }
                 }
-                val adapter = Network.moshi.adapter<List<TodoRemoteItem>>(
-                    Types.newParameterizedType(List::class.java, TodoRemoteItem::class.java)
-                )
-                val parsed = runCatching { adapter.fromJson(body) }.getOrNull().orEmpty()
-                FetchResult(parsed.map { it.toLocal() }, debug)
-            }
+                page += 1
+            } while (page <= totalPages)
+
+            FetchResult(items, debugParts.joinToString("; "))
         }
     }
 

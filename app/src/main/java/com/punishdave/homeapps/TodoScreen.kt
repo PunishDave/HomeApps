@@ -94,6 +94,11 @@ fun TodoScreen(
         orderTasksByDue(filterTasksForView(tasks, showingWeek))
     }
     val weekTaskCount = remember(tasks) { filterTasksForView(tasks, true).size }
+	val overdueTaskCount = remember(tasks) {
+		tasks.count { task ->
+			!task.done && parseFlexibleDate(task.dueDate)?.isBefore(LocalDate.now()) == true
+		}
+	}
     val newTaskText by vm.newTaskText.collectAsState()
     val dueDate by vm.dueDateText.collectAsState()
     val isSyncing by vm.isSyncing.collectAsState()
@@ -125,7 +130,11 @@ fun TodoScreen(
                 }
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = if (showingWeek) "This week" else "Today",
+					text = when {
+						showingWeek -> "This week"
+						overdueTaskCount > 0 -> "Today · $overdueTaskCount overdue"
+						else -> "Today"
+					},
                     color = Color.White,
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
@@ -287,7 +296,7 @@ private fun TasksSection(
             if (tasks.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (showingWeek) "No tasks due this week" else "No tasks due today",
+						if (showingWeek) "No tasks due this week" else "No tasks due today or overdue",
                         color = Color(0xFF777777),
                         style = MaterialTheme.typography.bodyMedium
                     )

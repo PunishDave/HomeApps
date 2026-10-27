@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
-import kotlin.math.abs
 
 @Composable
 internal fun TodoRow(
@@ -84,6 +83,11 @@ internal fun TodoRow(
 }
 
 private fun shortDate(raw: String): String {
+	val parsed = parseFlexibleDate(raw)
+	if (parsed != null && parsed.isBefore(LocalDate.now())) {
+		val days = LocalDate.now().toEpochDay() - parsed.toEpochDay()
+		return if (days == 1L) "1 day overdue" else "$days days overdue"
+	}
     return friendlyDateLabel(raw) ?: raw.trim()
 }
 
@@ -104,24 +108,22 @@ internal fun showDueDatePicker(context: android.content.Context, current: String
 
 private fun dueTextColor(raw: String): Color {
     val parsed = parseFlexibleDate(raw)
-    val isToday = parsed == LocalDate.now()
-    return if (isToday) TodoAccent else Color(0xFFBDBDBD)
+	val today = LocalDate.now()
+	return when {
+		parsed?.isBefore(today) == true -> Color(0xFFFF9B9B)
+		parsed == today -> TodoAccent
+		else -> Color(0xFFBDBDBD)
+	}
 }
 
 internal fun orderTasksByDue(tasks: List<TodoItem>): List<TodoItem> {
-    val today = LocalDate.now()
-    val todayEpoch = today.toEpochDay()
     val comparator = Comparator<TodoItem> { a, b ->
         val pa = parseFlexibleDate(a.dueDate)
         val pb = parseFlexibleDate(b.dueDate)
 
-        val da = pa?.let { abs(it.toEpochDay() - todayEpoch) } ?: Long.MAX_VALUE
-        val db = pb?.let { abs(it.toEpochDay() - todayEpoch) } ?: Long.MAX_VALUE
+		val da = pa?.toEpochDay() ?: Long.MAX_VALUE
+		val db = pb?.toEpochDay() ?: Long.MAX_VALUE
         if (da != db) return@Comparator da.compareTo(db)
-
-        val ea = pa?.toEpochDay() ?: Long.MAX_VALUE
-        val eb = pb?.toEpochDay() ?: Long.MAX_VALUE
-        if (ea != eb) return@Comparator ea.compareTo(eb)
 
         a.title.compareTo(b.title, ignoreCase = true)
     }
@@ -133,14 +135,17 @@ internal fun orderTasksByDue(tasks: List<TodoItem>): List<TodoItem> {
 internal fun filterTasksForView(tasks: List<TodoItem>, showingWeek: Boolean): List<TodoItem> {
     val today = LocalDate.now()
     if (!showingWeek) {
-        return tasks.filter { parseFlexibleDate(it.dueDate) == today }
+		return tasks.filter { task ->
+			val due = parseFlexibleDate(task.dueDate)
+			due == today || (!task.done && (due == null || due.isBefore(today)))
+		}
     }
 
     val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
     val weekEnd = weekStart.plusDays(6)
     return tasks.filter { task ->
-        val due = parseFlexibleDate(task.dueDate) ?: return@filter false
-        !due.isBefore(weekStart) && !due.isAfter(weekEnd)
+		val due = parseFlexibleDate(task.dueDate)
+		(!task.done && (due == null || due.isBefore(weekStart))) ||
+			(due != null && !due.isBefore(weekStart) && !due.isAfter(weekEnd))
     }
 }
-

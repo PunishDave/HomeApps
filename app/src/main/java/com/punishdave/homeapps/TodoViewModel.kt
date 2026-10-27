@@ -139,9 +139,12 @@ class TodoViewModel(app: Application) : AndroidViewModel(app) {
                 else -> remoteInitial.items
             }
 
+            // Keep offline-created tasks locally when an individual push fails so a later sync can retry.
+            val finalItems = (remoteLatestItems + pushed.failed).distinctBy { it.id }
+
             val (cats, habits) = repo.fetchMeta(key)
             repo.clearTasks()
-            repo.saveTasks(remoteLatestItems)
+            repo.saveTasks(finalItems)
             if (cats.isNotEmpty() && category.value.isBlank()) {
                 repo.saveCategory(cats.first())
             }
